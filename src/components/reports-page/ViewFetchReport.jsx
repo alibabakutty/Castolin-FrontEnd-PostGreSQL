@@ -303,7 +303,7 @@ const ViewFetchReport = ({ onBack }) => {
             <div className="border-t border-gray-300 bg-gray-50 py-2 px-3 font-amasis">
               <div className="flex justify-between items-center text-xs text-gray-600">
                 <div>
-                  Showing {filteredOrders.length} of {allOrders.length} pending sales quotations
+                  Showing {filteredOrders.length} of {allOrders.length} sales quotations
                   {searchTerm && ` for "${searchTerm}"`}
                 </div>
                 <div className="font-medium">Total: ₹ {totalFilteredAmount.toFixed(2)}</div>

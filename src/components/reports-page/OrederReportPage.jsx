@@ -10,6 +10,7 @@ const OrderReportPage = () => {
   console.log('Order number from URL:', orderNumber);
   const [date, setDate] = useState('');
   const [item, setItem] = useState(null);
+  const [voucherType, setVoucherType] = useState('');
   const [customerName, setCustomerName] = useState(null);
   const [executiveName, setExecutiveName] = useState(null);
   const [quantity, setQuantity] = useState('');
@@ -47,6 +48,7 @@ const OrderReportPage = () => {
 
   const transformOrderData = apiData => {
     return apiData.map(item => ({
+      voucher_type: item.voucher_type,
       id: item.id,
       itemCode: item.item_code,
       itemName: item.item_name,
@@ -74,6 +76,7 @@ const OrderReportPage = () => {
 
         if (data && data.length > 0) {
           setSelectedOrderData(data[0]);
+          setVoucherType(data[0].voucher_type || 'Sales Order');
           setCustomerName({
             customer_code: data[0].customer_code,
             customer_name: data[0].customer_name,
@@ -679,8 +682,8 @@ const handleSplDiscChange = (index, value) => {
             type="text"
             required
             readOnly
-            value={'Sales Order'}
-            className="outline-none border rounded-[5px] focus:border-[#932F67] p-[3.5px] text-sm bg-transparent font-medium w-full"
+            value={voucherType || 'Sales Order'}
+            className="outline-none border rounded-[5px] focus:border-[#932F67] p-[3.5px] text-sm bg-transparent font-medium w-52"
           />
           <span className="absolute left-2.5 top-[12px] transition-all pointer-events-none -translate-y-[17px] text-[#932F67] px-1.5 font-semibold text-[12px] bg-[#E9EFEC] leading-2 rounded">
             Voucher Type *

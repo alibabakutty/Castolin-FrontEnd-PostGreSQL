@@ -4,7 +4,7 @@ import Select from 'react-select';
 import { toast } from 'react-toastify';
 import api from '../../services/api';
 import { useAuth } from '../../context/ContextProvider';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 const Order = ({ onBack }) => {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -26,6 +26,8 @@ const Order = ({ onBack }) => {
   const navigate = useNavigate();
 
   const { user } = useAuth();
+
+  const location = useLocation();
 
   useEffect(() => {
     const handleKeyDown = e => {
@@ -205,6 +207,46 @@ const Order = ({ onBack }) => {
     itemSelectRef.current.focus();
   };
 
+  // Function to handle quantity change in table rows
+  const handleQuantityChange = (index, newQuantity) => {
+    // Allow empty string
+    if (newQuantity === '') {
+      const updatedRows = [...orderData];
+      const row = updatedRows[index];
+
+      row.itemQty = 0;
+      row.amount = 0;
+      row.grossAmount = 0;
+
+      setOrderData(updatedRows);
+      return;
+    }
+
+    // Only allow numbers and positive values
+    if (isNaN(newQuantity) || Number(newQuantity) < 0) {
+      return;
+    }
+
+    const updatedRows = [...orderData];
+    const row = updatedRows[index];
+
+    row.itemQty = Number(newQuantity);
+    row.amount = row.itemQty * row.rate;
+    row.grossAmount = row.itemQty * row.rate;
+
+    setOrderData(updatedRows);
+  };
+
+  // Function to remove item from order
+  const handleRemoveItem = index => {
+    const updatedRows = orderData.filter((_, i) => i !== index);
+    setOrderData(updatedRows);
+    toast.info('Item removed from order!', {
+      position: 'bottom-right',
+      autoClose: 3000,
+    });
+  };
+
   const postOrder = async () => {
     if (isSubmitttingRef.current) return; // Prevent multiple submissions
 
@@ -222,7 +264,7 @@ const Order = ({ onBack }) => {
       // clear order data and database after successful submission
       setOrderData([]);
       setDatebase([]);
-      setRemarks('')
+      setRemarks('');
 
       toast.success('Order Placed Successfully and waiting for approval!.', {
         position: 'bottom-right',
@@ -250,8 +292,20 @@ const Order = ({ onBack }) => {
     }
 
     if (orderData.length >= 1) {
+      // determine voucher type based on location path
+      const getVoucherType = () => {
+        if (location.pathname.includes('/corporate')) {
+          return 'Corporate Order-Direct';
+        } else if (location.pathname.includes('/distributor')) {
+          return 'Distributor Order-Web Based';
+        } else {
+          return 'Sales Order';
+        }
+      };
+
+      const voucherType = getVoucherType();
       const dbd = orderData.map(item => ({
-        voucher_type: 'Sales Order',
+        voucher_type: voucherType,
         order_no: orderNumber,
         date,
         status: 'pending',
@@ -419,7 +473,7 @@ const Order = ({ onBack }) => {
   };
 
   // Format for display - show as whole number
-  const formatQuantityForDisplay = (quantity) => {
+  const formatQuantityForDisplay = quantity => {
     const num = Number(quantity) || 0;
     // Remove any decimal places for display
     return Math.floor(num).toString();
@@ -441,8 +495,14 @@ const Order = ({ onBack }) => {
             type="text"
             required
             readOnly
-            value={'Sales Order'}
-            className="outline-none border rounded-[5px] focus: border-[#932F67]  p-[3.5px] text-sm bg-transparent font-medium"
+            value={
+              location.pathname === '/corporate'
+                ? 'Corporate Order-Direct'
+                : location.pathname === '/distributor'
+                ? 'Distributor Order-Web Based'
+                : 'Select Order'
+            }
+            className="outline-none border rounded-[5px] focus: border-[#932F67]  p-[3.5px] text-sm bg-transparent font-medium w-52"
           />
           <span
             className="absolute left-2.5 top-[12px]  transition-all pointer-events-none -translate-y-[17px] text-[#932F67]
@@ -606,17 +666,11 @@ const Order = ({ onBack }) => {
                   width: '100%',
                   backgroundColor: '#F8F4EC',
                   borderColor: '#932F67',
-                  // borderRadius: '5px',
                   boxShadow: 'none',
-                  // fontWeight: '300',
-                  // textAlign: 'center',
-                  // cursor: 'pointer',
                 }),
                 singleValue: base => ({
                   ...base,
-                  // fontWeight: '300',
-                  // textAlign: 'center',
-                  lineHeight: '1'
+                  lineHeight: '1',
                 }),
                 placeholder: base => ({
                   ...base,
@@ -642,7 +696,7 @@ const Order = ({ onBack }) => {
                 menuList: base => ({
                   ...base,
                   padding: '0',
-                })
+                }),
               }}
               menuPortalTarget={document.body}
             />
@@ -654,13 +708,15 @@ const Order = ({ onBack }) => {
           <div className="flex items-center ml-5">
             <span className="text-sm mr-2 font-medium">Quantity * :</span>
             <input
-              type="text"
+              type="number"
               name="qty"
               ref={quantityInputRef}
               value={quantity}
               onChange={e => setQuantity(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder='0'
+              placeholder="0"
+              min="0"
+              step="1"
               className="py-1 border w-16 outline-none text-sm rounded px-1 border-[#932F67] bg-[#F8F4EC] text-center"
               autoComplete="off"
             />
@@ -671,7 +727,7 @@ const Order = ({ onBack }) => {
               ref={buttonRef}
               value={'Add'}
               onClick={handleClick}
-              className="bg-[#693382] text-white px-4 rounded-[6px] py-1 outline-none"
+              className="bg-[#693382] text-white px-4 rounded-[6px] py-1 outline-none cursor-pointer"
             />
           </div>
 
@@ -686,7 +742,7 @@ const Order = ({ onBack }) => {
           <div className="flex w-44 justify-end">
             <button
               onClick={handleSubmit}
-              className="bg-[#693382] text-white px-4 rounded-[6px] py-0.5 outline-none"
+              className="bg-[#693382] text-white px-4 rounded-[6px] py-0.5 outline-none cursor-pointer"
             >
               Save
             </button>
@@ -694,132 +750,162 @@ const Order = ({ onBack }) => {
         </div>
 
         {/* Table section */}
-        <div className="h-[70vh]">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-[#A2AADB] leading-3">
-                <td className="font-medium text-sm border border-gray-300 py-0.5 w-10 text-center">
-                  S.No
-                </td>
-                <td className="font-medium text-sm border border-gray-300 py-0.5 px-2 w-28">
-                  Product Code
-                </td>
-                <td className="font-medium text-sm border border-gray-300 py-0.5 px-2 w-[400px] text-center">
-                  Product Name
-                </td>
-                <td className="font-medium text-sm border border-gray-300 py-0.5 text-center w-20">
-                  HSN
-                </td>
-                <td className="font-medium text-sm border border-gray-300 py-0.5 px-1 w-14 text-center">
-                  GST %
-                </td>
-                <td className="font-medium text-sm border border-gray-300 py-0.5 px-2 text-right w-24">
-                  Quantity
-                </td>
-                <td className="font-medium text-sm border border-gray-300 py-0.5 px-2 w-12">UOM</td>
-                <td className="font-medium text-sm border border-gray-300 py-0.5 px-2 text-right w-24">
-                  Rate
-                </td>
-                <td className="font-medium text-sm border border-gray-300 py-0.5 px-2 text-right w-28">
-                  Amount
-                </td>
-                <td className="font-medium text-sm border border-gray-300 py-0.5 px-2 text-right w-28">
-                  Net Amount
-                </td>
-                <td className="font-medium border text-sm border-gray-300 py-0.5 px-2 text-right w-28">
-                  Gross Amount
-                </td>
-              </tr>
-            </thead>
-            <tbody>
-              {orderData.length === 0 ? (
-                <tr>
-                  <td colSpan={11} className="text-center border border-gray-300">
-                    <div className="flex items-center justify-center p-5">
-                      <AiFillExclamationCircle className="text-red-700 text-[28px] mx-1" />
-                      No Records Found...
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                orderData.map((item, index) => (
-                  <tr key={index} className="leading-12">
-                    <td className="border border-gray-400  text-center text-sm">{index + 1}</td>
-                    <td className="border border-gray-400  text-center text-sm">{item.itemCode}</td>
-                    <td className="border border-gray-400  px-2 text-sm">{item.itemName}</td>
-                    <td className="border border-gray-400  text-center text-sm">{item.hsn}</td>
-                    <td className="border border-gray-400  text-center text-sm">{item.gst}</td>
-                    <td className="border border-gray-400  px-2 text-right text-sm">
-                      {formatQuantityForDisplay(item.itemQty)}
-                    </td>
-                    <td className="border border-gray-400  text-center text-sm">{item.uom}</td>
-                    <td className="border border-gray-400  px-2 text-right text-sm">
-                      {formatCurrency(item.rate)}
-                    </td>
-                    <td className="border border-gray-400  px-2 text-right text-sm">
-                      {formatCurrency(item.amount)}
-                    </td>
-
-                    <td className="border border-gray-400  px-2 text-right text-sm">
-                      {formatCurrency(item.netRate)}
-                    </td>
-                    <td className="border border-gray-400  px-2 text-right text-sm">
-                      {formatCurrency(item.grossAmount)}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="h-[7vh] flex justify-end border-t items-center">
-          <div className="w-2/4 px-0.5">
-            <div className="relative flex gap-2">
-              <textarea
-                name="remarks"
-                id="remarks"
-                placeholder="Remarks"
-                value={remarks}
-                onChange={e => setRemarks(e.target.value)}
-                className="border border-[#932F67] resize-none md:w-[400px] outline-none rounded px-1  peer h-[26px] bg-[#F8F4EC] mb-1 ml-1"
-              ></textarea>
-
-              <div>
-                <label htmlFor="" className="text-sm font-medium ml-3">
-                  Status :{' '}
-                </label>
-                <select
-                  name=""
-                  id=""
-                  disabled={true}
-                  className="outline-none appearance-none border border-[#932F67] px-1 text-sm rounded ml-1 mt-0.5"
-                >
-                  <option value="">Pending</option>
-                </select>
+<div className="h-[70vh] flex flex-col">
+  <table className="w-full">
+    <thead>
+      <tr className="bg-[#A2AADB] leading-3">
+        <th className="font-medium text-sm border border-gray-300 py-0.5 w-10 text-center">
+          S.No
+        </th>
+        <th className="font-medium text-sm border border-gray-300 py-0.5 px-2 w-28">
+          Product Code
+        </th>
+        <th className="font-medium text-sm border border-gray-300 py-0.5 px-2 w-[400px] text-center">
+          Product Name
+        </th>
+        <th className="font-medium text-sm border border-gray-300 py-0.5 text-center w-20">
+          HSN
+        </th>
+        <th className="font-medium text-sm border border-gray-300 py-0.5 px-1 w-14 text-center">
+          GST %
+        </th>
+        <th className="font-medium text-sm border border-gray-300 py-0.5 px-2 text-center w-12">
+          Qty
+        </th>
+        <th className="font-medium text-sm border border-gray-300 py-0.5 w-10">UOM</th>
+        <th className="font-medium text-sm border border-gray-300 py-0.5 px-2 text-right w-[85px]">
+          Rate
+        </th>
+        <th className="font-medium text-sm border border-gray-300 py-0.5 w-[86px]">
+          Amount
+        </th>
+        <th className="font-medium text-sm border border-gray-300 py-0.5 pr-1 w-[94px]">
+          Net Amount
+        </th>
+        <th className="font-medium border text-sm border-gray-300 py-0.5 text-center w-[105px]">
+          Gross Amount
+        </th>
+        <th className="font-medium text-sm border border-gray-300 py-0.5 px-2 text-center w-[76px]">
+          Action
+        </th>
+      </tr>
+    </thead>
+  </table>
+  
+  {/* Scrollable table body container */}
+  <div className={`flex-1 overflow-y-auto ${orderData.length > 15 ? 'max-h-[65vh]' : ''}`}>
+    <table className="w-full">
+      <tbody>
+        {orderData.length === 0 ? (
+          <tr>
+            <td colSpan={12} className="text-center border border-gray-300">
+              <div className="flex items-center justify-center p-5">
+                <AiFillExclamationCircle className="text-red-700 text-[28px] mx-1" />
+                No Records Found...
               </div>
-            </div>
-          </div>
-          <div>
-            <p className="font-medium pr-2 mb-0.5">Total</p>
-          </div>
-          <div className="w-2/4 px-0.5 py-1">
-            <table className="w-full border-b mb-1">
-              <tfoot>
-                <tr className="*:border-[#932F67]">
-                  <td className="text-right border w-24 px-1">{formatQuantityForDisplay(totals.qty)}</td>
-                  <td className="w-32 border"></td>
+            </td>
+          </tr>
+        ) : (
+          orderData.map((item, index) => (
+            <tr key={index} className="leading-12">
+              <td className="border border-gray-400 text-center text-sm w-[40px]">{index + 1}</td>
+              <td className="border border-gray-400 text-center text-sm">{item.itemCode}</td>
+              <td className="border border-gray-400 px-2 text-sm w-[450px]">{item.itemName}</td>
+              <td className="border border-gray-400 text-center text-sm">{item.hsn}</td>
+              <td className="border border-gray-400 text-center text-sm w-[50px]">{item.gst}</td>
+              <td className="border border-gray-400 px-2 text-right text-sm bg-[#F8F4EC]">
+                <input
+                  type="text"
+                  value={item.itemQty === 0 ? '' : item.itemQty}
+                  onChange={e => {
+                    const value = e.target.value.replace(/[^\d]/g, '');
+                    handleQuantityChange(index, value);
+                  }}
+                  onBlur={e => {
+                    if (e.target.value === '') {
+                      handleQuantityChange(index, '1');
+                    }
+                  }}
+                  className="w-[20px] text-right border-none outline-none bg-transparent px-1"
+                />
+              </td>
+              <td className="border border-gray-400 text-center text-sm w-[50px]">{item.uom}</td>
+              <td className="border border-gray-400  px-2 text-right text-sm">
+                {formatCurrency(item.rate)}
+              </td>
+              <td className="border border-gray-400 px-2 text-right text-sm">
+                {formatCurrency(item.amount)}
+              </td>
+              <td className="border border-gray-400 px-2 text-right text-sm w-[100px]">
+                {formatCurrency(item.netRate)}
+              </td>
+              <td className="border border-gray-400 px-2 text-right text-sm w-[117px]">
+                {formatCurrency(item.grossAmount)}
+              </td>
+              <td className="border border-gray-400 text-center text-sm">
+                <button
+                  onClick={() => handleRemoveItem(index)}
+                  className="bg-red-500 text-white px-2 py-1 rounded text-xs hover:bg-red-600"
+                >
+                  Remove
+                </button>
+              </td>
+            </tr>
+          ))
+        )}
+      </tbody>
+    </table>
+  </div>
+</div>
 
-                  <td className="text-right border w-28 px-1">{formatCurrency(totals.amount)}</td>
+{/* Footer section - remove the mt-[320px] */}
+<div className="h-[7vh] flex border-t items-center">
+  <div className="w-2/4 px-0.5">
+    <div className="relative flex gap-2">
+      <textarea
+        name="remarks"
+        id="remarks"
+        placeholder="Remarks"
+        value={remarks}
+        onChange={e => setRemarks(e.target.value)}
+        className="border border-[#932F67] resize-none md:w-[400px] outline-none rounded px-1  peer h-[26px] bg-[#F8F4EC] mb-1 ml-1"
+      ></textarea>
 
-                  <td className="text-right border w-24 px-1"></td>
+      <div>
+        <label htmlFor="" className="text-sm font-medium ml-3">
+          Status :{' '}
+        </label>
+        <select
+          name=""
+          id=""
+          disabled={true}
+          className="outline-none appearance-none border border-[#932F67] px-1 text-sm rounded ml-1 mt-0.5"
+        >
+          <option value="">Pending</option>
+        </select>
+      </div>
+    </div>
+  </div>
+  <div>
+    <p className="font-medium pr-2 mb-0.5">Total</p>
+  </div>
+  <div className="w-[550px] px-0.5 py-1">
+    <table className="w-full border-b mb-1">
+      <tfoot>
+        <tr className="*:border-[#932F67]">
+          <td className="text-right border w-16 px-1">
+            {formatQuantityForDisplay(totals.qty)}
+          </td>
+          <td className="w-32 border"></td>
+          <td className="text-right border w-28 px-1">{formatCurrency(totals.amount)}</td>
+          <td className="text-right border w-24 px-1"></td>
+          <td className="text-right border w-28 px-1">{formatCurrency(totals.grossAmt)}</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
 
-                  <td className="text-right border w-28 px-1">{formatCurrency(totals.grossAmt)}</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        </div>
       </div>
     </div>
   );
