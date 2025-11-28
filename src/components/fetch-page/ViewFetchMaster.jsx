@@ -121,7 +121,7 @@ const ViewFetchMaster = () => {
 
         case 'Escape':
           e.preventDefault();
-          navigate(-1);
+          navigate('/admin');
           break;
 
         case 'Enter':
@@ -273,101 +273,54 @@ const ViewFetchMaster = () => {
       switch (type) {
         case 'inventory':
           return (
-            <div className="flex justify-between items-start">
-              <div className="flex-1">
-                <p className="text-[12px] text-gray-800">{`${item.item_code}-${item.stock_item_name}`}</p>
-                {item.category && (
-                  <p className="text-xs text-gray-600">
-                    Category: <span className="text-blue-600">{item.category}</span>
-                  </p>
-                )}
-                {item.quantity !== undefined && (
-                  <p className="text-xs text-gray-600">
-                    Qty:{' '}
-                    <span
-                      className={
-                        item.quantity > 10
-                          ? 'text-green-600'
-                          : item.quantity > 0
-                          ? 'text-yellow-600'
-                          : 'text-red-600'
-                      }
-                    >
-                      {item.quantity}
-                    </span>
-                  </p>
-                )}
-                {item.price !== undefined && (
-                  <p className="text-xs text-gray-600">
-                    Price:{' '}
-                    <span className="text-green-600 font-medium">
-                      ${typeof item.price === 'number' ? item.price.toFixed(2) : item.price}
-                    </span>
-                  </p>
-                )}
+            <div className="w-full flex items-center text-[12px]">
+              {/* Code - minimal width */}
+              <div className="w-[15%] text-gray-800 truncate">{item.item_code}</div>
+              {/* Name - double width */}
+              <div className="w-[50%] text-gray-800 truncate">{item.stock_item_name}</div>
+              <div className="w-[20%] text-gray-800 truncate text-center">{item.hsn}</div>
+              <div className="w-[20%] text-gray-800 truncate text-right">
+                ₹ {parseFloat(item.rate || 0).toFixed(2)}
               </div>
             </div>
           );
 
         case 'customer':
           return (
-            <div className="flex justify-between items-start">
-              <div className="flex-1">
-                <p className="text-[12px] text-gray-800">{`${item.customer_code}-${item.customer_name} - ${item.role.toUpperCase()}`}</p>
-                {item.phone && (
-                  <p className="text-xs text-gray-600">
-                    Phone: <span className="text-gray-800">{item.phone}</span>
-                  </p>
-                )}
-                {item.company_name && (
-                  <p className="text-xs text-gray-600">
-                    Company: <span className="text-purple-600">{item.company_name}</span>
-                  </p>
-                )}
-              </div>
+            <div className="w-full flex items-center text-[12px]">
+              {/* Code - minimal width */}
+              <div className="w-[15%] text-gray-800 truncate">{item.customer_code}</div>
+              {/* Name - double width */}
+              <div className="w-[50%] text-gray-800 truncate">{item.customer_name}</div>
+              <div className="w-[20%] text-gray-800 truncate">{item.mobile_number}</div>
+              <div className="w-[20%] text-gray-800 truncate">{item.role.toUpperCase()}</div>
             </div>
           );
 
         case 'distributor':
           return (
-            <div className="flex justify-between items-start">
-              <div className="flex-1">
-                <p className="text-xs text-gray-800">{`${item.customer_code} - ${item.customer_name} - ${item.mobile_number}`}</p>
-                {item.status && (
-                  <p className="text-xs text-gray-600">
-                    Status:{' '}
-                    <span className={item.status === 'active' ? 'text-green-600' : 'text-red-600'}>
-                      {item.status}
-                    </span>
-                  </p>
-                )}
-                {item.department && (
-                  <p className="text-xs text-gray-600">
-                    Department: <span className="text-purple-600">{item.department}</span>
-                  </p>
-                )}
+            <div className="w-full flex items-center text-[12px]">
+              {/* Code - minimal width */}
+              <div className="w-[15%] text-gray-800 truncate">{item.customer_code}</div>
+              {/* Name - double width */}
+              <div className="w-[50%] text-gray-800 truncate">{item.customer_name}</div>
+              <div className="w-[20%] text-gray-800 truncate">{item.mobile_number}</div>
+              <div className="w-[20%] text-gray-800 truncate">
+                {item.customer_type.toUpperCase()}
               </div>
             </div>
           );
 
         case 'direct':
           return (
-            <div className="flex justify-between items-start">
-              <div className="flex-1">
-                <p className="text-xs text-gray-800">{`${item.customer_code} - ${item.customer_name} - ${item.mobile_number}`}</p>
-                {item.status && (
-                  <p className="text-xs text-gray-600">
-                    Status:{' '}
-                    <span className={item.status === 'active' ? 'text-green-600' : 'text-red-600'}>
-                      {item.status}
-                    </span>
-                  </p>
-                )}
-                {item.department && (
-                  <p className="text-xs text-gray-600">
-                    Department: <span className="text-purple-600">{item.department}</span>
-                  </p>
-                )}
+            <div className="w-full flex items-center text-[12px]">
+              {/* Code - minimal width */}
+              <div className="w-[15%] text-gray-800 truncate">{item.customer_code}</div>
+              {/* Name - double width */}
+              <div className="w-[50%] text-gray-800 truncate">{item.customer_name}</div>
+              <div className="w-[20%] text-gray-800 truncate">{item.mobile_number}</div>
+              <div className="w-[20%] text-gray-800 truncate">
+                {item.customer_type.toUpperCase()}
               </div>
             </div>
           );
@@ -438,7 +391,7 @@ const ViewFetchMaster = () => {
               {searchTerm ? 'No items match your search.' : `No ${currentModule.itemName} found.`}
             </div>
           ) : (
-            <ul className="divide-y divide-gray-300">
+            <ul className="divide-y divide-gray-300 leading-4">
               {filteredData.map((item, index) => renderListItem(item, index))}
             </ul>
           )}
@@ -459,7 +412,7 @@ const ViewFetchMaster = () => {
       <div className="w-[100%] h-[100vh] flex">
         <div className="w-1/2 bg-gradient-to-t to-blue-500 from-[#ccc]">
           <button
-            onClick={() => navigate(-1)}
+            onClick={() => navigate('/admin')}
             className="flex items-center gap-2 text-white hover:text-gray-200 transition-colors bg-white/20 hover:bg-white/30 px-3 py-2 rounded-lg backdrop-blur-sm"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -474,7 +427,7 @@ const ViewFetchMaster = () => {
           </button>
         </div>
         <div className="w-1/2 bg-slate-100 border border-1-blue-400 flex justify-center flex-col items-center">
-          <div className="w-[50%] h-16 flex flex-col justify-center items-center border border-black bg-white border-b-0">
+          <div className="w-[100%] h-16 flex flex-col justify-center items-center bg-white border-b-0">
             <p className="text-[13px] font-semibold underline underline-offset-4 decoration-gray-400 text-gray-700">
               {currentModule.itemName.toUpperCase()} DISPLAY
             </p>
@@ -484,30 +437,28 @@ const ViewFetchMaster = () => {
               value={searchTerm}
               ref={searchInputRef}
               onChange={handleSearchChange}
-              className="w-[250px] ml-2 mt-2 h-5 capitalize font-medium pl-1 text-sm focus:bg-yellow-200 focus:border focus:border-blue-500 focus:outline-0 relative z-10"
+              className="w-[500px] ml-2 mt-2 h-5 capitalize font-medium pl-1 text-sm focus:bg-yellow-200 focus:border focus:border-blue-500 focus:outline-0 relative z-10"
               autoComplete="off"
             />
           </div>
-          <div className="w-[350px] h-[89vh] border border-gray-600 bg-[#def1fc]">
+          <div className="w-[682px] h-[89vh] bg-[#def1fc]">
             <h2 className="p-1 bg-[#2a67b1] text-white text-left text-[13px] pl-3">
               List of {typeNames[type] || 'Items'}
             </h2>
             <div className="border border-b-slate-400 flex justify-between px-2 py-1">
-              <div className="w-full">
-                <button
-                  onClick={() => navigate(currentModule?.createLink || '#')}
-                  className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
-                >
-                  Create
-                </button>
-              </div>
-              <div className="w-full text-right">
-                <button
-                  onClick={() => navigate('/admin')}
-                  className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
-                >
-                  Home
-                </button>
+              {/* Use grid layout with Name taking double width */}
+              <div className="w-full flex text-xs font-medium">
+                {/* Code column - minimal width */}
+                <div className="w-[15%]">Code</div>
+                {/* Name column - double width */}
+                <div className="w-[45%]">Name</div>
+
+                {/* Conditional columns */}
+                {type !== 'inventory' && <div className="w-[20%]">Mobile Number</div>}
+                {type !== 'inventory' && <div className="w-[20%]">Type</div>}
+
+                {type === 'inventory' && <div className="w-[20%] text-center">HSN</div>}
+                {type === 'inventory' && <div className="w-[20%] text-center">Rate</div>}
               </div>
             </div>
             {renderContent()}

@@ -265,8 +265,8 @@ const ContextProvider = ({ children }) => {
     }
   };
 
-  const signupDistributor = async (usercode, updates, email, password) => {
-    setIsSigningUp(true);
+  // In your Auth Context
+  const createDistributorFirebaseAccount = async (usercode, updates, email, password) => {
     try {
       const credential = await createUserWithEmailAndPassword(auth, email, password);
       const firebaseUser = credential.user;
@@ -285,13 +285,17 @@ const ContextProvider = ({ children }) => {
       // Sign out the distributor immediately
       await signOut(auth);
 
+      // ✅ Automatically re-login as admin
+      const adminLoginResult = await loginAdmin('admin123@gmail.com', '12345678');
+
       return {
         success: true,
         message: res.data?.message,
         affectedRows: res.data?.affectedRows,
+        adminReLogin: adminLoginResult.success,
       };
     } catch (error) {
-      console.error('Distributor update failed:', error);
+      console.error('Distributor Firebase creation failed:', error);
       if (auth.currentUser && auth.currentUser.email === email) {
         await auth.currentUser.delete();
       }
@@ -299,8 +303,75 @@ const ContextProvider = ({ children }) => {
         success: false,
         message: error.response?.data?.error || error.message,
       };
-    } finally {
-      setIsSigningUp(false);
+    }
+  };
+
+  const createDirectOrderFirebaseAccount = async (usercode, updates, email, password) => {
+    try {
+      const credential = await createUserWithEmailAndPassword(auth, email, password);
+      const firebaseUser = credential.user;
+      const token = await firebaseUser.getIdToken();
+
+      const updatePayload = {
+        ...updates,
+        firebase_uid: firebaseUser.uid,
+        email: email,
+      };
+
+      const res = await api.put(`corporates/${usercode}`, updatePayload, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      await signOut(auth);
+
+      const adminLoginResult = await loginAdmin('admin123@gmail.com', '12345678');
+
+      return {
+        success: true,
+        message: res.data?.message,
+        affectedRows: res.data?.affectedRows,
+        adminReLogin: adminLoginResult.success,
+      }
+    } catch (error) {
+      console.error('Direct Order Firebase creation failed!', error);
+      if (auth.currentUser && auth.currentUser.email === email) {
+        await auth.currentUser.delete();
+      }
+      return {
+        success: false,
+        message: error.response?.data?.error || error.message,
+      }
+    }
+  }
+
+  // Add admin login function
+  const loginAdmin = async (email = 'admin123@gmail.com', password = '12345678') => {
+    try {
+      const credential = await signInWithEmailAndPassword(auth, email, password);
+      const firebaseUser = credential.user;
+      const token = await firebaseUser.getIdToken();
+
+      const res = await api.get('/me-admin', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      const role = res.data[0]?.role || null;
+
+      // Immediately sync to context
+      setUser({ ...firebaseUser, role });
+      setRole(role);
+
+      return {
+        success: true,
+        role,
+        user: firebaseUser,
+      };
+    } catch (error) {
+      console.error('Admin re-login failed:', error);
+      return {
+        success: false,
+        message: error.message,
+      };
     }
   };
 
@@ -353,7 +424,9 @@ const ContextProvider = ({ children }) => {
         user,
         distributorUser,
         signup,
-        signupDistributor,
+        createDistributorFirebaseAccount,
+        createDirectOrderFirebaseAccount,
+        loginAdmin,
         signupDirectOrder,
         login,
         loginDistributor,

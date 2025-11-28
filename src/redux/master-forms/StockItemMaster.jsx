@@ -118,26 +118,26 @@ const StockItemMaster = () => {
         </button>
       </div>
 
-      <form action="" className="w-[25%] h-[30vh] ml-[68px] bg-[#FBFBFB]">
+      <form action="" className="w-[30%] h-[30vh] bg-[#FBFBFB]">
         <div className='text-[13px] flex mt-2 ml-2 leading-4'>
           <label htmlFor="item_code" className='w-[34%]'>Product Code</label>
           <span>:</span>
-          <input type="text" name='item_code' value={stockItemData.item_code || ''} ref={(input) => (inputRef.current[0] = input)} onChange={handleInputChange} onKeyDown={(e) => handleKeyDown(e, 0)} className='w-[200px] ml-2 pl-0.5 h-5 font-medium text-[13px] capitalize focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent' autoComplete='off' readOnly={mode === 'display'} />
+          <input type="text" name='item_code' value={stockItemData.item_code || ''} ref={(input) => (inputRef.current[0] = input)} onChange={handleInputChange} onKeyDown={(e) => handleKeyDown(e, 0)} className='w-[150px] ml-2 pl-0.5 h-5 font-medium text-[13px] capitalize focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent' autoComplete='off' readOnly={mode === 'display'} />
         </div>
         <div className='text-[13px] flex mt-2 ml-2 leading-4'>
           <label htmlFor="stock_item_name" className='w-[34%]'>Product Name</label>
           <span>:</span>
-          <input type="text" name='stock_item_name' value={stockItemData.stock_item_name || ''} ref={(input) => (inputRef.current[1] = input)} onChange={handleInputChange} onKeyDown={(e) => handleKeyDown(e, 1)} className='w-[200px] ml-2 pl-0.5 h-5 font-medium text-[13px] capitalize focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent' autoComplete='off' readOnly={mode === 'display'} />
+          <input type="text" name='stock_item_name' value={stockItemData.stock_item_name || ''} ref={(input) => (inputRef.current[1] = input)} onChange={handleInputChange} onKeyDown={(e) => handleKeyDown(e, 1)} className='w-[250px] ml-2 pl-0.5 h-5 font-medium text-[13px] capitalize focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent' autoComplete='off' readOnly={mode === 'display'} />
         </div>
         <div className='text-[13px] flex mt-2 ml-2 leading-4'>
           <label htmlFor="hsn" className='w-[34%]'>HSN Code</label>
           <span>:</span>
-          <input type="text" name='hsn' value={stockItemData.hsn || ''} ref={(input) => (inputRef.current[2] = input)} onChange={handleInputChange} onKeyDown={(e) => handleKeyDown(e, 2)} className='w-[200px] ml-2 pl-0.5 h-5 font-medium text-[13px] capitalize focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent' autoComplete='off' readOnly={mode === 'display'} />
+          <input type="text" name='hsn' value={stockItemData.hsn || ''} ref={(input) => (inputRef.current[2] = input)} onChange={handleInputChange} onKeyDown={(e) => handleKeyDown(e, 2)} className='w-[100px] ml-2 pl-0.5 h-5 font-medium text-[13px] capitalize focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent' autoComplete='off' readOnly={mode === 'display'} />
         </div>
         <div className='text-[13px] flex mt-2 ml-2 leading-4'>
           <label htmlFor="gst" className='w-[34%]'>GST</label>
           <span>:</span>
-          <input type="text" name='gst' value={stockItemData.gst || ''} ref={(input) => (inputRef.current[3] = input)} onKeyDown={(e) => handleKeyDown(e, 3)} className='w-[200px] ml-2 pl-0.5 h-5 font-medium text-[13px] capitalize focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent' autoComplete='off'readOnly={mode === 'display'} />
+          <input type="text" name='gst' value={stockItemData.gst || ''} ref={(input) => (inputRef.current[3] = input)} onKeyDown={(e) => handleKeyDown(e, 3)} className='w-[100px] ml-2 pl-0.5 h-5 font-medium text-[13px] capitalize focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent' autoComplete='off'readOnly={mode === 'display'} />
         </div>
         <div className='text-[13px] flex mt-2 ml-2 leading-4'>
           <label htmlFor="uom" className='w-[34%]'>UOM</label>
@@ -147,7 +147,7 @@ const StockItemMaster = () => {
         <div className='text-[13px] flex mt-2 ml-2 leading-4'>
           <label htmlFor="rate" className='w-[34%]'>Rate</label>
           <span>:</span>
-          <input type="text" name='rate' value={stockItemData.rate || ''} ref={(input) => (inputRef.current[5] = input)} onChange={handleInputChange} onKeyDown={(e) => handleKeyDown(e, 5)} className='w-[200px] ml-2 pl-0.5 h-5 font-medium text-[13px] capitalize focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent' autoComplete='off' readOnly={mode === 'display'} />
+          <input type="text" name='rate' value={stockItemData.rate || ''} ref={(input) => (inputRef.current[5] = input)} onChange={handleInputChange} onKeyDown={(e) => handleKeyDown(e, 5)} className='w-[100px] ml-2 pl-0.5 h-5 font-medium text-[13px] capitalize focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent' autoComplete='off' readOnly={mode === 'display'} />
         </div>
       </form>
       <RightSideButton />

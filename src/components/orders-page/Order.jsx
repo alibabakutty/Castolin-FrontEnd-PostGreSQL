@@ -1013,14 +1013,14 @@ const Order = ({ onBack }) => {
               </div>
             </div>
           </div>
-          <div className="ml-48">
+          <div className="ml-44">
             <p className="font-medium pr-2 mb-0.5">Total</p>
           </div>
-          <div className="w-[350px] px-0.5 py-1">
+          <div className="w-[375px] px-0.5 py-1">
             <table className="w-full border-b mb-1">
               <tfoot>
                 <tr className="*:border-[#932F67]">
-                  <td className="text-right border w-16 px-1">{totals.qty}</td>
+                  <td className="text-right border w-8 px-1">{totals.qty}</td>
                   <td className="text-right border w-28 px-1">{formatCurrency(totals.amount)}</td>
                 </tr>
               </tfoot>

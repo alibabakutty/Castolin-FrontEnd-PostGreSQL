@@ -6,7 +6,6 @@ import { useDispatch, useSelector } from 'react-redux';
 import { toast } from 'react-toastify';
 import { setModeDistributorData, updateFieldDistributorData } from '../slices/distributorSlice';
 import { fetchDistributorByUsercode } from '../thunks/distributorThunks';
-import api from '../../services/api';
 import { useAuth } from '../../context/ContextProvider';
 
 const DistributorMaster = () => {
@@ -16,7 +15,7 @@ const DistributorMaster = () => {
   const navigate = useNavigate();
   const inputRef = useRef([]);
 
-  const { signupDistributor } = useAuth();
+  const { createDistributorFirebaseAccount } = useAuth();
 
   useEffect(() => {
     const path = location.pathname;
@@ -50,7 +49,7 @@ const DistributorMaster = () => {
   const handleKeyDown = (e, index) => {
     const key = e.key;
     const { value, selectionStart } = e.target;
-    
+
     if (key === 'Enter') {
       e.preventDefault();
       if (e.target.value.trim() !== '') {
@@ -87,84 +86,45 @@ const DistributorMaster = () => {
   };
 
   const handleSubmit = async e => {
-  e.preventDefault();
+    e.preventDefault();
 
-  if (mode === 'create') {
-    // Your existing create logic...
-    try {
-      const distributorPayload = [{
-        customer_code: distributorData.customer_code,
-        customer_name: distributorData.customer_name,
-        mobile_number: distributorData.mobile_number,
-        email: distributorData.email,
-        password: distributorData.password || '',
-        role: 'distributor',
-        firebase_uid: ''
-      }];
+    if (mode === 'create') {
+      // Your existing create logic (not needed as per your requirement)
+    } else {
+      // For update mode - use the enhanced createDistributorFirebaseAccount
+      try {
+        const result = await createDistributorFirebaseAccount(
+          distributorData.customer_code,
+          {
+            customer_name: distributorData.customer_name,
+            mobile_number: distributorData.mobile_number,
+            customer_type: distributorData.customer_type,
+            role: distributorData.customer_type,
+            email: distributorData.email,
+            password: distributorData.password,
+          },
+          distributorData.email,
+          distributorData.password,
+        );
 
-      const response = await api.post('/distributors', distributorPayload, {
-        headers: {
-          'Content-Type': 'application/json',
+        if (result.success) {
+          toast.success('Distributor updated successfully!', {
+            position: 'bottom-right',
+            autoClose: 300,
+          });
+
+          // ✅ Navigate to distributor list page after successful update
+          setTimeout(() => {
+            navigate('/fetch-view-master/distributor');
+          }, 50);
+        } else {
+          toast.error(result.message || 'Failed to update distributor');
         }
-      });
-
-      if (response.data) {
-        toast.success('Distributor created successfully!', {
-          position: 'bottom-right',
-          autoClose: 3000,
-        });
-        
-        // Reset form
-        dispatch(setModeDistributorData('create'));
-        dispatch(updateFieldDistributorData({ name: 'customer_name', value: '' }));
-        dispatch(updateFieldDistributorData({ name: 'mobile_number', value: '' }));
-        dispatch(updateFieldDistributorData({ name: 'email', value: '' }));
-        dispatch(updateFieldDistributorData({ name: 'password', value: '' }));
-
-        if (inputRef.current[0]) {
-          inputRef.current[0].focus();
-        }
+      } catch (error) {
+        toast.error(error.message || 'Failed to update distributor');
       }
-    } catch (error) {
-      toast.error(error.response?.data?.error || 'Failed to create distributor');
     }
-  } else {
-    // For update mode - use the enhanced signupDistributor
-    try {
-      const updates = {
-        customer_name: distributorData.customer_name,
-        mobile_number: distributorData.mobile_number,
-        customer_type: distributorData.customer_type,
-        role:  distributorData.customer_type,
-        email: distributorData.email,
-        password: distributorData.password,
-        // Don't include password here as it's handled by Firebase
-      };
-
-      const result = await signupDistributor(
-        distributorData.customer_code, // or customer_code based on your backend
-        updates,
-        distributorData.email,
-        distributorData.password
-      );
-
-      if (result.success) {
-        toast.success('Distributor updated successfully!', {
-          position: 'bottom-right',
-          autoClose: 3000,
-        });
-        
-        // Reset form or navigate away
-        dispatch(setModeDistributorData('create'));
-        // ... reset other fields
-      } else {
-        toast.error(result.message || 'Failed to update distributor');
-      }
-    } catch (error) {
-      toast.error(error.message || 'Failed to update distributor');
-    }
-  }
-};
+  };
 
   const handleBack = () => {
     navigate(-1); // Go back to previous page
@@ -191,7 +151,7 @@ const DistributorMaster = () => {
         </button>
       </div>
 
-      <form action="" onSubmit={handleSubmit} className="w-[25%] h-[29vh] ml-[68px] bg-[#FBFBFB]">
+      <form action="" onSubmit={handleSubmit} className="w-[30%] h-[29vh] bg-[#FBFBFB]">
         <div className="text-[13px] flex mt-2 ml-2 leading-4">
           <label htmlFor="customer_code" className="w-[34%]">
             Distributor Code
@@ -204,7 +164,7 @@ const DistributorMaster = () => {
             ref={input => (inputRef.current[0] = input)}
             onChange={handleInputChange}
             onKeyDown={e => handleKeyDown(e, 0)}
-            className="w-[200px] ml-2 pl-0.5 h-5 font-medium text-[13px] capitalize focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent"
+            className="w-[150px] ml-2 pl-0.5 h-5 font-medium text-[13px] capitalize focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent"
             autoComplete="off"
             readOnly={mode === 'display'}
           />
@@ -221,7 +181,7 @@ const DistributorMaster = () => {
             ref={input => (inputRef.current[1] = input)}
             onChange={handleInputChange}
             onKeyDown={e => handleKeyDown(e, 1)}
-            className="w-[200px] ml-2 pl-0.5 h-5 font-medium text-[13px] capitalize focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent"
+            className="w-[250px] ml-2 pl-0.5 h-5 font-medium text-[13px] capitalize focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent"
             autoComplete="off"
             readOnly={mode === 'display'}
           />
@@ -238,7 +198,7 @@ const DistributorMaster = () => {
             ref={input => (inputRef.current[2] = input)}
             onChange={handleInputChange}
             onKeyDown={e => handleKeyDown(e, 2)}
-            className="w-[200px] ml-2 pl-0.5 h-5 font-medium text-[13px] capitalize focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent"
+            className="w-[150px] ml-2 pl-0.5 h-5 font-medium text-[13px] capitalize focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent"
             autoComplete="off"
             readOnly
           />
@@ -255,7 +215,7 @@ const DistributorMaster = () => {
             ref={input => (inputRef.current[3] = input)}
             onChange={handleInputChange}
             onKeyDown={e => handleKeyDown(e, 3)}
-            className="w-[200px] ml-2 pl-0.5 h-5 font-medium text-[13px] capitalize focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent"
+            className="w-[150px] ml-2 pl-0.5 h-5 font-medium text-[13px] capitalize focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent"
             autoComplete="off"
             readOnly
           />
@@ -272,7 +232,7 @@ const DistributorMaster = () => {
             ref={input => (inputRef.current[4] = input)}
             onChange={handleInputChange}
             onKeyDown={e => handleKeyDown(e, 4)}
-            className="w-[200px] ml-2 pl-0.5 h-5 font-medium text-[13px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent"
+            className="w-[250px] ml-2 pl-0.5 h-5 font-medium text-[13px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent"
             autoComplete="off"
             readOnly
           />
@@ -289,11 +249,10 @@ const DistributorMaster = () => {
             ref={input => (inputRef.current[5] = input)}
             onChange={handleInputChange}
             onKeyDown={e => handleKeyDown(e, 5)}
-            className="w-[200px] ml-2 pl-0.5 h-5 font-medium text-[13px] capitalize focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent"
+            className="w-[250px] ml-2 pl-0.5 h-5 font-medium text-[13px] capitalize focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent"
             autoComplete="off"
           />
         </div>
-        
       </form>
       <RightSideButton />
     </div>

@@ -121,9 +121,9 @@ const CustomerMaster = () => {
           </svg>
           <span className="text-sm font-medium">Back</span>
         </button>
-      </div>
+      </div> 
 
-      <form onSubmit={handleSubmit} className="w-[25%] h-[24vh] ml-[68px] bg-[#FBFBFB]">
+      <form onSubmit={handleSubmit} className="w-[30%] h-[24vh] bg-[#FBFBFB]">
         <div className='text-[13px] flex mt-2 ml-2 leading-4'>
           <label htmlFor="customer_code" className='w-[34%]'>Customer Code</label>
           <span>:</span>
@@ -134,7 +134,7 @@ const CustomerMaster = () => {
             ref={(input) => (inputRef.current[0] = input)} 
             onChange={handleInputChange} 
             onKeyDown={(e) => handleKeyDown(e, 0)}
-            className='w-[200px] ml-2 pl-0.5 h-5 font-medium text-[13px] capitalize focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent' 
+            className='w-[150px] ml-2 pl-0.5 h-5 font-medium text-[13px] capitalize focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent' 
             autoComplete='off' 
             readOnly={mode === 'display'} 
           />
@@ -149,7 +149,7 @@ const CustomerMaster = () => {
             ref={(input) => (inputRef.current[1] = input)} 
             onChange={handleInputChange} 
             onKeyDown={(e) => handleKeyDown(e, 1)}
-            className='w-[200px] ml-2 pl-0.5 h-5 font-medium text-[13px] capitalize focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent' 
+            className='w-[250px] ml-2 pl-0.5 h-5 font-medium text-[13px] capitalize focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent' 
             autoComplete='off' 
             readOnly={mode === 'display'} 
           />
@@ -164,7 +164,7 @@ const CustomerMaster = () => {
             ref={(input) => (inputRef.current[2] = input)} 
             onChange={handleInputChange} 
             onKeyDown={(e) => handleKeyDown(e, 2)}
-            className='w-[200px] ml-2 pl-0.5 h-5 font-medium text-[13px] capitalize focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent' 
+            className='w-[150px] ml-2 pl-0.5 h-5 font-medium text-[13px] capitalize focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent' 
             autoComplete='off' 
             readOnly={mode === 'display'} 
           />
@@ -179,7 +179,7 @@ const CustomerMaster = () => {
             ref={(input) => (inputRef.current[3] = input)} 
             onChange={handleInputChange} 
             onKeyDown={(e) => handleKeyDown(e, 3)}
-            className='w-[200px] ml-2 pl-0.5 h-5 font-medium text-[13px] capitalize focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent' 
+            className='w-[250px] ml-2 pl-0.5 h-5 font-medium text-[13px] capitalize focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent' 
             autoComplete='off' 
             readOnly={mode === 'display'} 
           />
@@ -194,7 +194,7 @@ const CustomerMaster = () => {
             ref={(input) => (inputRef.current[4] = input)} 
             onChange={handleInputChange} 
             onKeyDown={(e) => handleKeyDown(e, 4)}
-            className='w-[200px] ml-2 pl-0.5 h-5 font-medium text-[13px] capitalize focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent' 
+            className='w-[250px] ml-2 pl-0.5 h-5 font-medium text-[13px] capitalize focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent' 
             autoComplete='off' 
             readOnly={mode === 'display'} 
           />

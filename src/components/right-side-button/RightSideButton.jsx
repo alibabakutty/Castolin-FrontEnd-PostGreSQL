@@ -58,7 +58,7 @@ const RightSideButton = () => {
             />{' '}
             <span className={`text-sm font-medium absolute left-[28px] top-[11px] ${disableAll || isCreatePath ? 'cursor-not-allowed text-gray-600' : 'cursor-pointer'}`}>C:</span>
           </Link> */}
-          <Link to={disableAll || isDisplayPath ? '#' : `/${type}/display`}>
+          {/* <Link to={disableAll || isDisplayPath ? '#' : `/${type}/display`}>
             <input
               type='button'
               value='Display'
@@ -66,7 +66,7 @@ const RightSideButton = () => {
               className={`mb-1 w-28 pl-[12px] border border-gray-400 bg-white text-sm shadow-md ${disableAll || isDisplayPath ? 'text-gray-600 cursor-not-allowed' : 'cursor-pointer'}`}
             />{' '}
             <span className={`text-sm font-medium absolute left-[28px] top-[11px] ${disableAll || isDisplayPath ? 'cursor-not-allowed text-gray-600' : 'cursor-pointer'}`}>D:</span>
-          </Link>
+          </Link> */}
           {/* <Link to={disableAll || isAlterPath ? '#' : `/${type}/alter`}>
             <input
               type='button'

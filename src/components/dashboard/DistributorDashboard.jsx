@@ -12,6 +12,18 @@ const DistributorDashboard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
+  useEffect(() => {
+    const handleEscapeKey = (event) => {
+      if (event.key === 'Escape') {
+        handleLogout();
+      }
+    }
+    document.addEventListener('keydown', handleEscapeKey);
+    return () => {
+      document.removeEventListener('keydown', handleEscapeKey);
+    }
+  }, [navigate]);
+
   const currentDate = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
@@ -44,6 +56,12 @@ const DistributorDashboard = () => {
 
   // Logout function
   const handleLogout = async () => {
+    const userConfirmed = window.confirm('Are you sure you want to logout?');
+
+    if (!userConfirmed) {
+      return;
+    }
+
     try {
       await logout();
       toast.success('Logged out successfully!', {
@@ -62,14 +80,14 @@ const DistributorDashboard = () => {
 
   // Show only Dashboard
   return (
-    <div className="min-h-screen bg-gray-50 p-6 font-amasis">
+    <div className="min-h-screen bg-gradient-to-t to-blue-500 from-[#ccc] p-6 font-amasis">
       {/* Header with Date and Time */}
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4">
           {/* Left side - Back button, Title, and User info */}
           <div className="flex items-center gap-4">
             <button
-              onClick={() => navigate(-1)}
+              onClick={() => handleLogout()}
               className="flex items-center gap-2 text-blue-600 hover:text-blue-700 transition-colors"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

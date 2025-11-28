@@ -14,7 +14,7 @@ const CorporateMaster = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const inputRef = useRef([]);
-  const { signupDirectOrder } = useAuth();
+  const { createDirectOrderFirebaseAccount } = useAuth();
 
   useEffect(() => {
     const path = location.pathname;
@@ -92,36 +92,33 @@ const CorporateMaster = () => {
     } else {
       // For update mode - use the enhanced signupDirectorder
       try {
-        const updates = {
-          customer_name: corporateData.customer_name,
-          mobile_number: corporateData.mobile_number,
-          customer_type: corporateData.customer_type,
-          role: corporateData.customer_type,
-          email: corporateData.email,
-          password: corporateData.password,
-        };
-
-        const result = await signupDirectOrder(
+        const result = await createDirectOrderFirebaseAccount(
           corporateData.customer_code,
-          updates,
+          {
+            customer_name: corporateData.customer_name,
+            mobile_number: corporateData.mobile_number,
+            customer_type: corporateData.customer_type,
+            email: corporateData.email,
+            password: corporateData.password,
+          },
           corporateData.email,
           corporateData.password
         );
 
         if (result.success) {
-          toast.success('Direct Order updated successfully!', {
+          toast.success('Direct order updated successfully!', {
             position: 'bottom-right',
-            autoClose: 3000,
+            autoClose: 300,
           });
-
-          // reset form or navigate away
-          dispatch(setModeCorporateData('create'));
-
+          
+          setTimeout(() => {
+            navigate(`/fetch-view-master/direct`);
+          }, 50);
         } else {
-          toast.error(result.message || 'Failed to update Direct order');
+          toast.error(error.message || 'Failed to update direct order');
         }
       } catch (error) {
-        toast.error(error.message || 'Failed to update direct order');
+        toast.error(error.message || 'Error updating direct order');
       }
     }
   };
@@ -150,7 +147,7 @@ const CorporateMaster = () => {
         </button>
       </div>
 
-      <form action="" onSubmit={handleSubmit} className="w-[25%] h-[29vh] ml-[68px] bg-[#FBFBFB]">
+      <form action="" onSubmit={handleSubmit} className="w-[30%] h-[29vh] bg-[#FBFBFB]">
         <div className="text-[13px] flex mt-2 ml-2 leading-4">
           <label htmlFor="customer_code" className="w-[34%]">
             Direct Order Code
@@ -163,7 +160,7 @@ const CorporateMaster = () => {
             ref={input => (inputRef.current[0] = input)}
             onChange={handleInputChange}
             onKeyDown={e => handleKeyDown(e, 0)}
-            className="w-[200px] ml-2 pl-0.5 h-5 font-medium text-[13px] capitalize focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent"
+            className="w-[150px] ml-2 pl-0.5 h-5 font-medium text-[13px] capitalize focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent"
             autoComplete="off"
             readOnly={mode === 'display'}
           />
@@ -180,7 +177,7 @@ const CorporateMaster = () => {
             ref={input => (inputRef.current[1] = input)}
             onChange={handleInputChange}
             onKeyDown={e => handleKeyDown(e, 1)}
-            className="w-[200px] ml-2 pl-0.5 h-5 font-medium text-[13px] capitalize focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent"
+            className="w-[250px] ml-2 pl-0.5 h-5 font-medium text-[13px] capitalize focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent"
             autoComplete="off"
             readOnly={mode === 'display'}
           />
@@ -197,7 +194,7 @@ const CorporateMaster = () => {
             ref={input => (inputRef.current[2] = input)}
             onChange={handleInputChange}
             onKeyDown={e => handleKeyDown(e, 2)}
-            className="w-[200px] ml-2 pl-0.5 h-5 font-medium text-[13px] capitalize focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent"
+            className="w-[150px] ml-2 pl-0.5 h-5 font-medium text-[13px] capitalize focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent"
             autoComplete="off"
             readOnly={mode === 'display'}
           />
@@ -214,7 +211,7 @@ const CorporateMaster = () => {
             ref={input => (inputRef.current[3] = input)}
             onChange={handleInputChange}
             onKeyDown={e => handleKeyDown(e, 3)}
-            className="w-[200px] ml-2 pl-0.5 h-5 font-medium text-[13px] capitalize focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent"
+            className="w-[150px] ml-2 pl-0.5 h-5 font-medium text-[13px] capitalize focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent"
             autoComplete="off"
             readOnly
           />
@@ -231,7 +228,7 @@ const CorporateMaster = () => {
             ref={input => (inputRef.current[4] = input)}
             onChange={handleInputChange}
             onKeyDown={e => handleKeyDown(e, 4)}
-            className="w-[200px] ml-2 pl-0.5 h-5 font-medium text-[13px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent"
+            className="w-[250px] ml-2 pl-0.5 h-5 font-medium text-[13px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent"
             autoComplete="off"
             readOnly={mode === 'display'}
           />
@@ -248,7 +245,7 @@ const CorporateMaster = () => {
             ref={input => (inputRef.current[5] = input)}
             onChange={handleInputChange}
             onKeyDown={e => handleKeyDown(e, 5)}
-            className="w-[200px] ml-2 pl-0.5 h-5 font-medium text-[13px] capitalize focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent"
+            className="w-[250px] ml-2 pl-0.5 h-5 font-medium text-[13px] capitalize focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border border-transparent"
             autoComplete="off"
           />
         </div>

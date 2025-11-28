@@ -1,5 +1,4 @@
 import { useNavigate } from 'react-router-dom';
-import RightSideButton from './right-side-button/RightSideButton';
 import { useEffect } from 'react';
 
 const CDAPage = ({ onBack, moduleType }) => {
@@ -78,28 +77,15 @@ const CDAPage = ({ onBack, moduleType }) => {
   // Get current module configuration or default to distributor
   const currentModule = moduleConfig[moduleType] || moduleConfig.distributor;
 
-  // check if current module is distributor management
-  const isDistributorModule = moduleType === 'direct' || moduleType === 'distributor';
-
-  // const handleCreate = () => {
-  //   console.log(`Create ${moduleType} clicked`);
-  //   navigate(currentModule.createPage);
-  // };
-
   const handleView = () => {
     console.log(`View ${moduleType} clicked`);
     navigate(currentModule.viewPage);
   };
 
-  const handleAlter = () => {
-    console.log(`Alter ${moduleType} clicked`);
-    navigate(currentModule.alterPage);
-  };
-
   return (
-    <div className="container flex font-amasis">
-      <div className="w-[775px] h-[100vh] flex">
-        <div className="w-[775px] bg-gradient-to-t to-blue-500 from-[#ccc]">
+    <div className="flex font-amasis">
+      <div className="w-[883px] h-[100vh] flex">
+        <div className="w-[883px] bg-gradient-to-t to-blue-500 from-[#ccc]">
           {/* Back button */}
           <button
             onClick={onBack}
@@ -117,8 +103,8 @@ const CDAPage = ({ onBack, moduleType }) => {
           </button>
         </div>
       </div>
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-        <div className="w-[422px]">
+      <div className="min-h-screen bg-gradient-to-t to-blue-500 from-[#ccc] flex items-center justify-center p-4 border-l border-gray-300">
+        <div className="w-[450px]">
           {/* Header */}
           <div className="text-center mb-12">
             <h1 className="text-4xl font-medium text-gray-800 mb-4">{currentModule.title}</h1>
@@ -127,23 +113,6 @@ const CDAPage = ({ onBack, moduleType }) => {
 
           {/* Buttons Container */}
           <div className="bg-white rounded-2xl shadow-xl p-8 space-y-6">
-            {/* Create Button */}
-            {/* {isDistributorModule && (
-              <button
-                onClick={handleCreate}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 px-6 rounded-xl font-medium text-lg transition-all duration-200 transform hover:scale-105 hover:shadow-lg flex items-center justify-center gap-3"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 4v16m8-8H4"
-                  />
-                </svg>
-                {currentModule.createText}
-              </button>
-            )} */}
 
             {/* View Button */}
             <button
@@ -167,27 +136,9 @@ const CDAPage = ({ onBack, moduleType }) => {
               {currentModule.viewText}
             </button>
 
-            {/* Alter Button */}
-            {/* {isDistributorModule && (
-              <button
-                onClick={handleAlter}
-                className="w-full bg-purple-600 hover:bg-purple-700 text-white py-4 px-6 rounded-xl font-medium text-lg transition-all duration-200 transform hover:scale-105 hover:shadow-lg flex items-center justify-center gap-3"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                  />
-                </svg>
-                {currentModule.alterText}
-              </button>
-            )} */}
           </div>
         </div>
       </div>
-      <RightSideButton />
     </div>
   );
 };

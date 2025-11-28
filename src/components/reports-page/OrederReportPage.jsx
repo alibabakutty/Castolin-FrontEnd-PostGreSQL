@@ -1074,7 +1074,11 @@ const OrderReportPage = () => {
                   <td className="text-right border w-24 px-1">
                     {formatQuantityForDisplay(totals.qty)}
                   </td>
-                  <td className="w-32 border"></td>
+                  {!isViewOnlyReport && (
+                    <>
+                      <td className="w-32 border"></td>
+                    </>
+                  )}
 
                   <td className="text-right border w-28 px-1">{formatCurrency(totals.amount)}</td>
 
