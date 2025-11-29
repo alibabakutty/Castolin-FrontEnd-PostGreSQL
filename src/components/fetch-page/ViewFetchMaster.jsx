@@ -437,11 +437,11 @@ const ViewFetchMaster = () => {
               value={searchTerm}
               ref={searchInputRef}
               onChange={handleSearchChange}
-              className="w-[500px] ml-2 mt-2 h-5 capitalize font-medium pl-1 text-sm focus:bg-yellow-200 focus:border focus:border-blue-500 focus:outline-0 relative z-10"
+              className="w-[600px] ml-2 mt-2 h-5 capitalize font-medium pl-1 text-sm focus:bg-yellow-200 focus:border focus:border-blue-500 focus:outline-0 relative z-10"
               autoComplete="off"
             />
           </div>
-          <div className="w-[682px] h-[89vh] bg-[#def1fc]">
+          <div className="w-[682px] h-[89vh] bg-slate-200">
             <h2 className="p-1 bg-[#2a67b1] text-white text-left text-[13px] pl-3">
               List of {typeNames[type] || 'Items'}
             </h2>

@@ -110,13 +110,13 @@ const DistributorMaster = () => {
         if (result.success) {
           toast.success('Distributor updated successfully!', {
             position: 'bottom-right',
-            autoClose: 300,
+            autoClose: 50,
           });
 
           // ✅ Navigate to distributor list page after successful update
           setTimeout(() => {
             navigate('/fetch-view-master/distributor');
-          }, 50);
+          }, 10);
         } else {
           toast.error(result.message || 'Failed to update distributor');
         }

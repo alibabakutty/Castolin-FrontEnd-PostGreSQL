@@ -108,12 +108,12 @@ const CorporateMaster = () => {
         if (result.success) {
           toast.success('Direct order updated successfully!', {
             position: 'bottom-right',
-            autoClose: 300,
+            autoClose: 50,
           });
           
           setTimeout(() => {
             navigate(`/fetch-view-master/direct`);
-          }, 50);
+          }, 10);
         } else {
           toast.error(error.message || 'Failed to update direct order');
         }

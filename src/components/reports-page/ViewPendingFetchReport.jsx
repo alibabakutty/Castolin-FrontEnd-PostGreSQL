@@ -1,20 +1,34 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import RightSideButton from '../right-side-button/RightSideButton';
 import Title from '../Title';
 import api from '../../services/api';
 import { useNavigate } from 'react-router-dom';
 
-const ViewFetchOrder = ({ onBack }) => {
+const ViewPendingFetchReport = ({ onBack }) => {
   const [allOrders, setAllOrders] = useState([]);
   const [filteredOrders, setFilteredOrders] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [hasFetched, setHasFetched] = useState(false);
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [selectedRow, setSelectedRow] = useState(0);
+  const [selectedCol, setSelectedCol] = useState(0);
   const searchInputRef = useRef(null);
   const listContainerRef = useRef(null);
   const navigate = useNavigate();
+
+  // Column configuration matching your existing structure
+  const columns = [
+    { key: 'date', label: 'Date', width: '90px', align: 'left' },
+    { key: 'voucher_type', label: 'Vch Type', width: '250px', align: 'left' },
+    { key: 'order_no', label: 'Vch No.', width: '16%', align: 'center' },
+    { key: 'customer_code', label: 'Code', width: '100px', align: 'center' },
+    { key: 'customer_name', label: 'Customer', width: '30%', align: 'left' },
+    { key: 'executive', label: 'Executive', width: '28%', align: 'left' },
+    { key: 'delivery_date', label: 'Dely. Date', width: '120px', align: 'left' },
+    { key: 'delivery_mode', label: 'Dely. Mode', width: '100px', align: 'left' },
+    { key: 'status', label: 'Status', width: '9%', align: 'center' },
+    { key: 'amount', label: 'Amount', width: '10%', align: 'right' }
+  ];
 
   // Filter orders based on search term
   const filterOrders = useCallback((orders, searchValue) => {
@@ -24,17 +38,25 @@ const ViewFetchOrder = ({ onBack }) => {
     if (trimmedValue === '') return orders;
 
     return orders.filter(order => {
+      const voucherType = order.voucher_type?.toLowerCase() || '';
       const orderNo = order.order_no?.toString().toLowerCase() || '';
+      const customerCode = order.customer_code?.toLowerCase() || '';
       const customer = order.customer_name?.toLowerCase() || '';
       const executive = order.executive?.toLowerCase() || '';
+      const deliveryDate = formatDate(order.delivery_date)?.toLowerCase() || '';
+      const deliveryMode = order.delivery_mode?.toLowerCase() || '';
       const amount = order.total_amount?.toString().toLowerCase() || '';
       const status = order.status?.toLowerCase() || '';
       const createdAt = formatDate(order.created_at)?.toLowerCase() || '';
 
       return (
+        voucherType.includes(trimmedValue) ||
         orderNo.includes(trimmedValue) ||
+        customerCode.includes(trimmedValue) ||
         customer.includes(trimmedValue) ||
         executive.includes(trimmedValue) ||
+        deliveryDate.includes(trimmedValue) ||
+        deliveryMode.includes(trimmedValue) ||
         amount.includes(trimmedValue) ||
         status.includes(trimmedValue) ||
         createdAt.includes(trimmedValue)
@@ -44,24 +66,26 @@ const ViewFetchOrder = ({ onBack }) => {
 
   // Keyboard navigation handler
   useEffect(() => {
-    const handleKeyDown = (e) => {
+    const handleKeyDown = e => {
       switch (e.key) {
         case 'ArrowUp':
           e.preventDefault();
-          setSelectedIndex(prev => {
-            const newIndex = Math.max(0, prev - 1);
-            scrollToItem(newIndex);
-            return newIndex;
-          });
+          setSelectedRow(prev => Math.max(0, prev - 1));
           break;
 
         case 'ArrowDown':
           e.preventDefault();
-          setSelectedIndex(prev => {
-            const newIndex = Math.min(filteredOrders.length - 1, prev + 1);
-            scrollToItem(newIndex);
-            return newIndex;
-          });
+          setSelectedRow(prev => Math.min(filteredOrders.length - 1, prev + 1));
+          break;
+
+        case 'ArrowLeft':
+          e.preventDefault();
+          setSelectedCol(prev => Math.max(0, prev - 1));
+          break;
+
+        case 'ArrowRight':
+          e.preventDefault();
+          setSelectedCol(prev => Math.min(columns.length - 1, prev + 1));
           break;
 
         case 'Escape':
@@ -75,8 +99,26 @@ const ViewFetchOrder = ({ onBack }) => {
 
         case 'Enter':
           e.preventDefault();
-          if (filteredOrders[selectedIndex]) {
-            handleOrderClick(filteredOrders[selectedIndex]);
+          if (filteredOrders[selectedRow]) {
+            handleOrderClick(filteredOrders[selectedRow]);
+          }
+          break;
+
+        case 'Home':
+          e.preventDefault();
+          if (e.ctrlKey) {
+            setSelectedRow(0);
+          } else {
+            setSelectedCol(0);
+          }
+          break;
+
+        case 'End':
+          e.preventDefault();
+          if (e.ctrlKey) {
+            setSelectedRow(filteredOrders.length - 1);
+          } else {
+            setSelectedCol(columns.length - 1);
           }
           break;
 
@@ -92,24 +134,25 @@ const ViewFetchOrder = ({ onBack }) => {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [filteredOrders, selectedIndex, navigate, onBack]);
+  }, [filteredOrders, selectedRow, selectedCol, navigate, onBack, columns.length]);
 
-  // Scroll to selected item
-  const scrollToItem = (index) => {
-    if (listContainerRef.current) {
+  // Scroll to selected row
+  useEffect(() => {
+    if (listContainerRef.current && selectedRow >= 0) {
       const items = listContainerRef.current.querySelectorAll('[data-order-item]');
-      if (items[index]) {
-        items[index].scrollIntoView({
+      if (items[selectedRow]) {
+        items[selectedRow].scrollIntoView({
           behavior: 'smooth',
-          block: 'nearest'
+          block: 'nearest',
         });
       }
     }
-  };
+  }, [selectedRow]);
 
-  // Reset selected index when filtered orders change
+  // Reset selection when filtered orders change
   useEffect(() => {
-    setSelectedIndex(0);
+    setSelectedRow(0);
+    setSelectedCol(0);
   }, [filteredOrders]);
 
   // Fetch orders
@@ -187,6 +230,30 @@ const ViewFetchOrder = ({ onBack }) => {
     }
   };
 
+  // Handle cell click
+  const handleCellClick = (rowIndex, colIndex) => {
+    setSelectedRow(rowIndex);
+    setSelectedCol(colIndex);
+  };
+
+  // Get cell value based on column key
+  const getCellValue = (order, columnKey) => {
+    switch (columnKey) {
+      case 'date':
+        return formatDate(order.created_at);
+      case 'delivery_date':
+        return formatDate(order.delivery_date);
+      case 'amount':
+        return `₹ ${Number(order.total_amount || 0).toFixed(2)}`;
+      case 'executive':
+        return order.executive?.toUpperCase();
+      case 'status':
+        return order.status?.toUpperCase();
+      default:
+        return order[columnKey] || '';
+    }
+  };
+
   // Calculate total amount of filtered orders
   const totalFilteredAmount = filteredOrders.reduce((total, order) => {
     return total + (Number(order.total_amount) || 0);
@@ -219,41 +286,48 @@ const ViewFetchOrder = ({ onBack }) => {
     }
 
     return (
-      <div 
-        className="overflow-y-auto max-h-[79vh] text-xs font-amasis" 
-        ref={listContainerRef}
-      >
+      <div className="overflow-y-auto max-h-[79vh] text-xs font-amasis" ref={listContainerRef}>
         {filteredOrders.length > 0 ? (
-          filteredOrders.map((order, index) => {
-            const isSelected = index === selectedIndex;
+          filteredOrders.map((order, rowIndex) => {
+            const isRowSelected = rowIndex === selectedRow;
             return (
               <div
-                key={order.id || order.order_no || index}
+                key={order.id || order.order_no || rowIndex}
                 data-order-item
                 className={`flex justify-between items-center border-b border-gray-200 px-2 py-[2px] transition cursor-pointer ${
-                  isSelected 
-                    ? 'bg-yellow-100 border-yellow-300' 
-                    : index % 2 === 0 
-                      ? 'bg-white hover:bg-blue-50' 
-                      : 'bg-gray-100 hover:bg-blue-50'
+                  isRowSelected
+                    ? 'bg-yellow-100 border-yellow-300'
+                    : rowIndex % 2 === 0
+                    ? 'bg-white hover:bg-blue-50'
+                    : 'bg-gray-100 hover:bg-blue-50'
                 }`}
                 onClick={() => {
-                  setSelectedIndex(index);
+                  setSelectedRow(rowIndex);
                   handleOrderClick(order);
                 }}
               >
-                <div className="w-[15%] text-left">{formatDate(order.created_at)}</div>
-                <div className="w-[20%] text-center">{order.order_no}</div>
-                <div className="w-[35%] text-left truncate" title={order.customer_name}>
-                  {order.customer_name}
-                </div>
-                <div className="w-[20%] text-left truncate" title={order.executive}>
-                  {order.executive?.toUpperCase()}
-                </div>
-                <div className='w-[15%] text-center truncate'>{order.status.toUpperCase()}</div>
-                <div className="w-[20%] text-right pr-1">
-                  ₹ {Number(order.total_amount || 0).toFixed(2)}
-                </div>
+                {columns.map((column, colIndex) => {
+                  const isCellSelected = isRowSelected && colIndex === selectedCol;
+                  return (
+                    <div
+                      key={column.key}
+                      className={`border-r border-gray-200 last:border-r-0 py-1 ${
+                        isCellSelected ? 'bg-blue-200 ring-2 ring-blue-500' : ''
+                      }`}
+                      style={{ width: column.width }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCellClick(rowIndex, colIndex);
+                      }}
+                    >
+                      <div className={`${column.align === 'left' ? 'text-left' : column.align === 'center' ? 'text-center' : 'text-right'} ${
+                        column.key === 'customer_name' || column.key === 'executive' ? 'truncate' : ''
+                      }`} title={getCellValue(order, column.key)}>
+                        {getCellValue(order, column.key)}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             );
           })
@@ -280,14 +354,14 @@ const ViewFetchOrder = ({ onBack }) => {
             </div>
 
             {/* Right section — search box */}
-            <div className="w-full sm:w-auto">
+            <div className="flex-1 min-w-[300px] max-w-[500px]">
               <input
                 type="text"
                 placeholder="Search by order no, customer, executive, amount, or date..."
                 value={searchTerm}
                 ref={searchInputRef}
                 onChange={handleSearchChange}
-                className="w-full sm:w-80 h-8 px-3 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-amasis"
+                className="w-full h-8 px-3 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-amasis"
                 autoComplete="off"
               />
             </div>
@@ -297,13 +371,20 @@ const ViewFetchOrder = ({ onBack }) => {
           </div>
 
           {/* Column Headers */}
-          <div className="flex justify-between border-b-[1px] py-0.3 border-gray-300 bg-gray-100 font-amasis">
-            <div className="w-[15%] text-left pl-2">Date</div>
-            <div className="w-[20%] text-center">Vch No.</div>
-            <div className="w-[35%] text-left">Customer</div>
-            <div className="w-[20%] text-left">Executive</div>
-            <div className='w-[15%] text-center'>Status</div>
-            <div className="w-[20%] text-right pr-3">Amount</div>
+          <div className="flex justify-between border-b-[1px] py-0.3 border-gray-300 bg-gray-100 font-amasis text-sm">
+            {columns.map((column, colIndex) => (
+              <div
+                key={column.key}
+                className={`border-r border-gray-300 last:border-r-0 ${
+                  selectedCol === colIndex && selectedRow === -1 ? 'bg-blue-200 ring-2 ring-blue-500' : ''
+                }`}
+                style={{ width: column.width }}
+              >
+                <div className={column.align === 'left' ? 'text-left pl-2' : column.align === 'center' ? 'text-center' : 'text-right pr-3'}>
+                  {column.label}
+                </div>
+              </div>
+            ))}
           </div>
 
           {/* Orders List */}
@@ -327,4 +408,4 @@ const ViewFetchOrder = ({ onBack }) => {
   );
 };
 
-export default ViewFetchOrder;
+export default ViewPendingFetchReport;

@@ -55,8 +55,8 @@ const CustomerMaster = () => {
       if (nextField < inputRef.current.length) {
         inputRef.current[nextField].focus();
         inputRef.current[nextField].setSelectionRange(0, 0);
-      } else if (e.target.name === 'email') {
-        const userConfirmed = window.confirm('Do you want to confirm this submit?');
+      } else if (e.target.name === 'customer_type') {
+        const userConfirmed = window.confirm('Do you want go previous page?');
         if (userConfirmed) {
           handleSubmit(e);
           dispatch(setModeCustomerData('create'));
@@ -90,6 +90,7 @@ const CustomerMaster = () => {
       await handleCustomerSubmit(e, mode, customerData, dispatch, navigate, id, inputRef);
       if (mode === 'create') {
         alert('Customer created successfully!');
+        navigate(-1);
       } else if (mode === 'update') {
         alert('Customer updated successfully!');
       }

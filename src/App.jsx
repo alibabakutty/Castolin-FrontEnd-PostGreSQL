@@ -19,6 +19,8 @@ import CorporateDashboard from './components/dashboard/CorporateDashboard';
 import ViewFetchCorporate from './components/reports-page/ViewFetchCorporate';
 import ViewFetchDistributor from './components/reports-page/ViewFetchDistributor';
 import OrderReportPage from './components/reports-page/OrederReportPage';
+import ViewItemFetchReport from './components/reports-page/ViewItemFetchReport';
+import ViewPendingFetchReport from './components/reports-page/ViewPendingFetchReport';
 
 function App() {
   return (
@@ -126,6 +128,18 @@ function App() {
         <Route path='/fetch-report' element={
           <ProtectedRoutes roles={['admin']}>
             <ViewFetchReport />
+          </ProtectedRoutes>
+        } />
+        {/* for Pending fetch report page */}
+        <Route path='/fetch-pending-report' element={
+          <ProtectedRoutes roles={['admin']}>
+            <ViewPendingFetchReport />
+          </ProtectedRoutes>
+         } />
+        {/* Fetch itemwise report page */}
+        <Route path='/fetch-item-report' element={
+          <ProtectedRoutes roles={['admin']}>
+            <ViewItemFetchReport />
           </ProtectedRoutes>
         } />
         {/* Fetch report for Corporate */}

@@ -55,7 +55,7 @@ const StockItemMaster = () => {
         inputRef.current[nextField].focus();
         inputRef.current[nextField].setSelectionRange(0, 0);
       } else if (e.target.name === 'rate') {
-        const userConfirmed = window.confirm('Do you want to confirm this submit?');
+        const userConfirmed = window.confirm('Do you want go previous page?');
         if (userConfirmed) {
           handleSubmit(e);
           dispatch(setModeStockItemData('create'));

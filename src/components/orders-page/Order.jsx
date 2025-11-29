@@ -186,7 +186,6 @@ const Order = ({ onBack }) => {
       gst: item.gst,
       delivery_date: deliveryDate,
       delivery_mode: deliveryMode,
-      transporter_name: transporterName,
       itemQty: Number(quantity),
       uom: item.uom || "No's",
       rate: Number(item.rate),
@@ -270,7 +269,7 @@ const Order = ({ onBack }) => {
 
     if (selectedDate && selectedDate < date) {
       toast.error(
-        'Delivery date cannot be before order date! Please select today or a future date.',
+        'Please enter valid delivery date!',
         {
           position: 'bottom-right',
           autoClose: 4000,
@@ -370,7 +369,6 @@ const Order = ({ onBack }) => {
         gst: Number(String(item.gst).replace('%', '').trim()),
         delivery_date: item.delivery_date,
         delivery_mode: item.delivery_mode,
-        transporter_name: item.transporter_name,
         quantity: item.itemQty,
         uom: item.uom,
         rate: item.rate,

@@ -3,7 +3,7 @@ import Title from '../Title';
 import api from '../../services/api';
 import { useNavigate } from 'react-router-dom';
 
-const ViewFetchReport = ({ onBack }) => {
+const ViewItemFetchReport = ({ onBack }) => {
   const [allOrders, setAllOrders] = useState([]);
   const [filteredOrders, setFilteredOrders] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -14,20 +14,25 @@ const ViewFetchReport = ({ onBack }) => {
   const [selectedCol, setSelectedCol] = useState(0);
   const searchInputRef = useRef(null);
   const listContainerRef = useRef(null);
+  const horizontalScrollRef = useRef(null);
   const navigate = useNavigate();
 
-  // Column configuration matching your existing structure
+  // Column configuration
   const columns = [
-    { key: 'date', label: 'Date', width: '80px', align: 'center' },
-    { key: 'voucher_type', label: 'Vch Type', width: '180px', align: 'left' },
-    { key: 'order_no', label: 'Vch No.', width: '120px', align: 'center' },
-    { key: 'customer_code', label: 'Code', width: '100px', align: 'center' },
-    { key: 'customer_name', label: 'Customer', width: '300px', align: 'left' },
-    { key: 'executive', label: 'Executive', width: '300px', align: 'left' },
-    { key: 'delivery_date', label: 'Dely. Date', width: '100px', align: 'left' },
+    { key: 'date', label: 'Date', width: '75px', align: 'center' },
+    { key: 'voucher_type', label: 'Vch Type', width: '170px', align: 'left' },
+    { key: 'order_no', label: 'Vch No.', width: '120px', align: 'left' },
+    { key: 'customer_code', label: 'Code', width: '60px', align: 'left' },
+    { key: 'customer_name', label: 'Customer', width: '270px', align: 'left' },
+    { key: 'executive', label: 'Executive', width: '260px', align: 'left' },
+    { key: 'item_code', label: 'Item Code', width: '110px', align: 'left' },
+    { key: 'item_name', label: 'Item Name', width: '320px', align: 'left' },
+    { key: 'quantity', label: 'Qty', width: '60px', align: 'right' },
+    { key: 'uom', label: 'UOM', width: '40px', align: 'center' },
+    { key: 'delivery_date', label: 'Dely. Date', width: '75px', align: 'center' },
     { key: 'delivery_mode', label: 'Dely. Mode', width: '80px', align: 'left' },
-    { key: 'status', label: 'Status', width: '100px', align: 'left' },
-    { key: 'amount', label: 'Amount', width: '150px', align: 'right' }
+    { key: 'status', label: 'Status', width: '75px', align: 'left' },
+    { key: 'gross_amount', label: 'Amount', width: '90px', align: 'right' },
   ];
 
   // Filter orders based on search term
@@ -48,6 +53,10 @@ const ViewFetchReport = ({ onBack }) => {
       const amount = order.total_amount?.toString().toLowerCase() || '';
       const status = order.status?.toLowerCase() || '';
       const createdAt = formatDate(order.created_at)?.toLowerCase() || '';
+      const itemCode = order.item_code?.toString().toLowerCase() || '';
+      const itemName = order.item_name?.toString().toLowerCase() || '';
+      const quantity = order.quantity?.toString().toLowerCase() || '';
+      const uom = order.uom?.toString().toLowerCase() || '';
 
       return (
         voucherType.includes(trimmedValue) ||
@@ -59,10 +68,49 @@ const ViewFetchReport = ({ onBack }) => {
         deliveryMode.includes(trimmedValue) ||
         amount.includes(trimmedValue) ||
         status.includes(trimmedValue) ||
-        createdAt.includes(trimmedValue)
+        createdAt.includes(trimmedValue) ||
+        itemCode.includes(trimmedValue) ||
+        itemName.includes(trimmedValue) ||
+        quantity.includes(trimmedValue) ||
+        uom.includes(trimmedValue)
       );
     });
   }, []);
+
+  // Scroll to selected cell horizontally
+  const scrollToSelectedCell = useCallback(() => {
+    if (horizontalScrollRef.current && selectedCol >= 0) {
+      const container = horizontalScrollRef.current;
+      const selectedCell = container.querySelector(`[data-cell-row="${selectedRow}"][data-cell-col="${selectedCol}"]`);
+      
+      if (selectedCell) {
+        const containerRect = container.getBoundingClientRect();
+        const cellRect = selectedCell.getBoundingClientRect();
+        
+        // Check if cell is outside visible area
+        if (cellRect.left < containerRect.left) {
+          // Cell is to the left of visible area
+          container.scrollLeft -= (containerRect.left - cellRect.left + 10);
+        } else if (cellRect.right > containerRect.right) {
+          // Cell is to the right of visible area
+          container.scrollLeft += (cellRect.right - containerRect.right + 10);
+        }
+      }
+    }
+  }, [selectedRow, selectedCol]);
+
+  // Scroll to selected row vertically
+  const scrollToSelectedRow = useCallback(() => {
+    if (listContainerRef.current && selectedRow >= 0) {
+      const items = listContainerRef.current.querySelectorAll('[data-order-item]');
+      if (items[selectedRow]) {
+        items[selectedRow].scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+        });
+      }
+    }
+  }, [selectedRow]);
 
   useEffect(() => {
     const handleKeyDown = e => {
@@ -77,11 +125,17 @@ const ViewFetchReport = ({ onBack }) => {
           break;
         case 'ArrowLeft':
           e.preventDefault();
-          setSelectedCol(prev => Math.max(0, prev - 1));
+          setSelectedCol(prev => {
+            const newCol = Math.max(0, prev - 1);
+            return newCol;
+          });
           break;
         case 'ArrowRight':
           e.preventDefault();
-          setSelectedCol(prev => Math.min(columns.length - 1, prev + 1));
+          setSelectedCol(prev => {
+            const newCol = Math.min(columns.length - 1, prev + 1);
+            return newCol;
+          });
           break;
         case 'Escape':
           e.preventDefault();
@@ -101,6 +155,7 @@ const ViewFetchReport = ({ onBack }) => {
           e.preventDefault();
           if (e.ctrlKey) {
             setSelectedRow(0);
+            setSelectedCol(0);
           } else {
             setSelectedCol(0);
           }
@@ -109,8 +164,25 @@ const ViewFetchReport = ({ onBack }) => {
           e.preventDefault();
           if (e.ctrlKey) {
             setSelectedRow(filteredOrders.length - 1);
+            setSelectedCol(columns.length - 1);
           } else {
             setSelectedCol(columns.length - 1);
+          }
+          break;
+        case 'Tab':
+          e.preventDefault();
+          if (e.shiftKey) {
+            // Shift+Tab - move left
+            setSelectedCol(prev => {
+              const newCol = Math.max(0, prev - 1);
+              return newCol;
+            });
+          } else {
+            // Tab - move right
+            setSelectedCol(prev => {
+              const newCol = Math.min(columns.length - 1, prev + 1);
+              return newCol;
+            });
           }
           break;
         default:
@@ -124,20 +196,14 @@ const ViewFetchReport = ({ onBack }) => {
     };
   }, [filteredOrders, selectedRow, selectedCol, navigate, onBack, columns.length]);
 
-  // Scroll to selected row
+  // Scroll to selected items when selection changes
   useEffect(() => {
-    if (listContainerRef.current && selectedRow >= 0) {
-      const items = listContainerRef.current.querySelectorAll('[data-order-item]');
-      if (items[selectedRow]) {
-        items[selectedRow].scrollIntoView({
-          behavior: 'smooth',
-          block: 'nearest',
-        });
-      }
-    }
-  }, [selectedRow]);
+    scrollToSelectedRow();
+    // Use setTimeout to ensure DOM is updated with new selection
+    setTimeout(scrollToSelectedCell, 10);
+  }, [selectedRow, selectedCol, scrollToSelectedRow, scrollToSelectedCell]);
 
-  // Reset selected index when filter orders change
+  // Reset selection when filter orders change
   useEffect(() => {
     setSelectedRow(0);
     setSelectedCol(0);
@@ -155,19 +221,10 @@ const ViewFetchReport = ({ onBack }) => {
         const response = await api.get('/orders');
         const ordersData = response.data;
 
-        // Get unique pending orders by order_no
-        const pendingUniqueOrders = ordersData.reduce((acc, current) => {
-          const existingOrder = acc.find(order => order.order_no === current.order_no);
-          if (!existingOrder) {
-            acc.push(current);
-          }
-          return acc;
-        }, []);
-
-        setAllOrders(pendingUniqueOrders);
-        setFilteredOrders(pendingUniqueOrders);
+        setAllOrders(ordersData);
+        setFilteredOrders(ordersData);
         setHasFetched(true);
-        console.log('Pending orders:', pendingUniqueOrders);
+        console.log('Pending orders:', ordersData);
       } catch (error) {
         console.error('Error fetching orders:', error);
         setError('Failed to fetch orders');
@@ -252,7 +309,7 @@ const ViewFetchReport = ({ onBack }) => {
     if (loading && !hasFetched) {
       return (
         <div className="h-[70vh] flex items-center justify-center">
-          <div className="text-gray-500">Loading sales quotations...</div>
+          <div className="text-gray-500">Loading item-wise reports...</div>
         </div>
       );
     }
@@ -275,38 +332,36 @@ const ViewFetchReport = ({ onBack }) => {
 
     return (
       <div
-        className="overflow-auto max-h-[79vh] text-xs font-amasis scrollbar-hide"
+        className="overflow-auto h-[79vh] text-xs font-amasis"
         ref={listContainerRef}
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
         {filteredOrders.length > 0 ? (
-          <div className="min-w-[1400px]">
+          <div className="min-w-full">
             {filteredOrders.map((order, rowIndex) => {
               const isRowSelected = rowIndex === selectedRow;
               return (
                 <div
                   key={order.id || order.order_no || rowIndex}
                   data-order-item
-                  className={`flex items-center border-b border-gray-200 hover:bg-blue-300 transition cursor-pointer ${
+                  className={`flex items-center border-b border-gray-200 transition cursor-pointer ${
                     isRowSelected
                       ? 'bg-yellow-100 border-yellow-300'
                       : rowIndex % 2 === 0
                       ? 'bg-white hover:bg-blue-50'
                       : 'bg-gray-100 hover:bg-blue-50'
                   }`}
-                  onClick={() => {
-                    setSelectedRow(rowIndex);
-                    handleOrderClick(order);
-                  }}
+                  onClick={() => handleOrderClick(order)}
                 >
-                  {/* Single row with all elements */}
-                  <div className="flex items-center w-[1370px] px-1 py-0.5">
+                  <div className="flex items-center w-full min-w-full py-1">
                     {columns.map((column, colIndex) => {
                       const isCellSelected = isRowSelected && colIndex === selectedCol;
                       return (
                         <div
                           key={column.key}
-                          className={`border-r border-gray-200 last:border-r-0 ${
+                          data-cell-row={rowIndex}
+                          data-cell-col={colIndex}
+                          className={`flex-shrink-0 px-1 border-r border-gray-200 last:border-r-0 ${
                             isCellSelected ? 'bg-blue-200 ring-2 ring-blue-500' : ''
                           }`}
                           style={{ width: column.width }}
@@ -315,10 +370,11 @@ const ViewFetchReport = ({ onBack }) => {
                             handleCellClick(rowIndex, colIndex);
                           }}
                         >
-                          <div className={`${column.key === 'customer_name' || column.key === 'executive' ? 'px-1' : ''} ${
-                            column.align === 'left' ? 'text-left' : 
-                            column.align === 'center' ? 'text-center' : 'text-right'
-                          }`} title={getCellValue(order, column.key)}>
+                          <div className={`whitespace-normal break-words ${
+                            column.key === 'amount' ? 'text-right' : 
+                            column.key === 'customer_name' || column.key === 'executive' || 
+                            column.key === 'item_name' ||column.key === 'voucher_type' || column.key === 'item_code' || column.key === 'delivery_mode' || column.key === 'status' ? 'text-left' : 'text-center'
+                          }`}>
                             {getCellValue(order, column.key)}
                           </div>
                         </div>
@@ -330,8 +386,8 @@ const ViewFetchReport = ({ onBack }) => {
             })}
           </div>
         ) : (
-          <div className="text-center text-gray-500 py-8 min-w-[1400px]">
-            {searchTerm ? 'No orders match your search.' : 'No sales quotations found.'}
+          <div className="text-center text-gray-500 py-8 min-w-full">
+            {searchTerm ? 'No orders match your search.' : 'No item-wise reports found.'}
           </div>
         )}
       </div>
@@ -342,20 +398,18 @@ const ViewFetchReport = ({ onBack }) => {
     <div className="flex">
       <div className="w-full h-[100vh] flex">
         <div className="w-full overflow-hidden">
-          <Title title="Sales Quotation" nav={onBack} />
+          <Title title="Item Wise Report" nav={onBack} />
 
           {/* Header Row: Title + Date Range + Search */}
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b-2 border-gray-300 bg-white px-4 py-3">
-            {/* Left section - title */}
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b-2 border-gray-300 bg-white px-4 py-2">
             <div className="text-sm font-amasis text-gray-700 whitespace-nowrap">
-              List of All Sales Quotations
+              List of All Item-wise Sales Reports
             </div>
 
-            {/* Middle section - search box */}
             <div className="flex-1 min-w-[300px] max-w-[500px]">
               <input
                 type="text"
-                placeholder="Search by order no, customer, executive, amount, or date..."
+                placeholder="Search by order no, customer, item, executive, amount, or date..."
                 value={searchTerm}
                 ref={searchInputRef}
                 onChange={handleSearchChange}
@@ -364,63 +418,59 @@ const ViewFetchReport = ({ onBack }) => {
               />
             </div>
 
-            {/* Right section - date range */}
             <div className="text-sm font-amasis text-gray-600 whitespace-nowrap">
               1-Apr-25 to 31-May-26
             </div>
           </div>
 
-          {/* Column Headers - Single Row */}
-          <div
-            className="overflow-auto scrollbar-hide"
-            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          {/* Main Container with Horizontal Scroll */}
+          <div 
+            className="w-full overflow-x-auto"
+            ref={horizontalScrollRef}
           >
-            <div className="w-[1365px]">
-              <div className="flex items-center border-b border-gray-300 bg-gray-100 py-1 text-sm font-amasis text-gray-700">
+            <div className="min-w-[1810px]">
+              
+              {/* Column Headers - Single Row */}
+              <div className="flex items-center border-b border-gray-300 bg-gray-100 text-[14px] font-amasis font-medium text-gray-700">
                 {columns.map((column, colIndex) => (
                   <div
                     key={column.key}
-                    className={`border-r border-gray-300 last:border-r-0 ${
+                    className={`flex-shrink-0 px-1 border-r border-gray-300 last:border-r-0 ${
                       selectedCol === colIndex && selectedRow === -1 ? 'bg-blue-200 ring-2 ring-blue-500' : ''
                     }`}
                     style={{ width: column.width }}
                   >
-                    <div className={column.align === 'left' ? 'text-left' : column.align === 'center' ? 'text-center' : 'text-right'}>
+                    <div className={column.key === 'amount' ? 'text-right' : 'text-center'}>
                       {column.label}
                     </div>
                   </div>
                 ))}
               </div>
-            </div>
-          </div>
 
-          {/* Orders List */}
-          {renderContent()}
+              {/* Orders List */}
+              {renderContent()}
 
-          {/* Results Summary */}
-          {filteredOrders.length > 0 && (
-            <div
-              className="overflow-auto scrollbar-hide"
-              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-            >
-              <div className="min-w-[1400px] border-t border-gray-300 bg-gray-50 py-1 px-4 font-amasis">
-                <div className="flex justify-between items-center text-xs text-gray-600">
-                  <div>
-                    Showing {filteredOrders.length} of {allOrders.length} sales quotations
-                    {searchTerm && ` for "${searchTerm}"`}
-                  </div>
-                  <div className="font-medium text-gray-800 pr-9">
-                    Total: ₹{' '}
-                    {totalFilteredAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              {/* Results Summary */}
+              {filteredOrders.length > 0 && (
+                <div className="border-t border-gray-300 bg-gray-50 py-1 px-4 font-amasis">
+                  <div className="flex justify-between items-center text-xs text-gray-600">
+                    <div>
+                      Showing {filteredOrders.length} of {allOrders.length} item-wise reports
+                      {searchTerm && ` for "${searchTerm}"`}
+                    </div>
+                    <div className="font-medium text-gray-800 pr-2">
+                      Total: ₹{' '}
+                      {totalFilteredAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
       </div>
     </div>
   );
 };
 
-export default ViewFetchReport;
+export default ViewItemFetchReport;
