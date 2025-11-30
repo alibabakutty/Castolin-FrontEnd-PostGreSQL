@@ -9,7 +9,6 @@ import StockItemMaster from './redux/master-forms/StockItemMaster';
 import ViewFetchReport from './components/reports-page/ViewFetchReport';
 import OrederReportPage from './components/reports-page/OrederReportPage';
 import ViewFetchMaster from './components/fetch-page/ViewFetchMaster';
-import CorporateOrder from './components/orders-page/CorporateOrder';
 import CorporateAuthForm from './components/login-forms/CorporateAuthForm';
 import DistributorDashboard from './components/dashboard/DistributorDashboard';
 import DistributorMaster from './redux/master-forms/DistributorMaster';
@@ -119,11 +118,11 @@ function App() {
           </ProtectedRoutes>
         } />
         {/* For pending order page */}
-        <Route path='/order-report-pending/:orderNumber' element={
+        {/* <Route path='/order-report-pending/:orderNumber' element={
           <ProtectedRoutes roles={['admin']}>
             <CorporateOrder />
           </ProtectedRoutes>
-        } />
+        } /> */}
         {/* For fetch report page */}
         <Route path='/fetch-report' element={
           <ProtectedRoutes roles={['admin']}>

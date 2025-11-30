@@ -3,8 +3,8 @@ import { AiFillDelete, AiFillExclamationCircle, AiOutlineArrowLeft } from 'react
 import Select from 'react-select';
 import { toast } from 'react-toastify';
 import api from '../../services/api';
-import { useAuth } from '../../context/ContextProvider';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/authConstants';
 
 const Order = ({ onBack }) => {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);

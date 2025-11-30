@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 
 const RightSideButton = () => {
   const { type } = useParams();
@@ -8,12 +8,6 @@ const RightSideButton = () => {
 
   // Check if the current path is '/'
   const isRootPath = location.pathname === '/';
-  
-  const isCreatePath = location.pathname === `/menu/${type}`;
-
-  const isDisplayPath = location.pathname === `/${type}/display` || location.pathname.startsWith(`/stockItemMasterApi/displayStockItem`);
-
-  const isAlterPath = location.pathname === `/${type}/alter` || location.pathname.startsWith(`/stockItemMasterApi/alterStockItemMaster`);
 
   // Flag to disable all buttons if on specific paths
   const disableAll = location.pathname.startsWith(`/stockItemMasterApi/displayStockItem`) || location.pathname.startsWith(`/stockItemMasterApi/alterStockItemMaster`) || location.pathname.startsWith('/stockItemTestApi/displayStockItem') || location.pathname.startsWith('/stockItemTestApi/alterStockItemMaster');

@@ -1,18 +1,15 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../../context/ContextProvider';
-import { useCredentials } from '../hooks-credentials-history/userCredentials';
 import { toast } from 'react-toastify';
+import { useAuth } from '../../context/authConstants';
 
 const CorporateAuthForm = () => {
   const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [showCredentialsHistory, setShowCredentialsHistory] = useState(false);
 
   const { loginCorporate } = useAuth();
-  const { credentialsHistory, saveCredentials, removeCredential } = useCredentials('corporate');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -34,8 +31,6 @@ const CorporateAuthForm = () => {
       const result = await loginCorporate(loginEmail, password);
 
       if (result.success) {
-        // save credentials after successful login
-        await saveCredentials(loginEmail, password, username);
 
         if (result.role === 'direct') {
           navigate('/corporate');
@@ -57,20 +52,6 @@ const CorporateAuthForm = () => {
       setIsLoading(false);
     }
   };
-
-  const useCredential = (credential) => {
-    setUsername(credential.email || credential.username || '');
-    setPassword(credential.password);
-    setShowCredentialsHistory(false);
-  }
-
-  const handleRemoveCredential = (email) => {
-    removeCredential(email);
-    toast.info('Credential removed from history', {
-      position: 'bottom-right',
-      autoClose: 3000
-    });
-  }
 
   const isFormValid = () => {
     return username.trim() !== '' && password.trim() !== '';

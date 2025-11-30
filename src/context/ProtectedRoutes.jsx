@@ -1,5 +1,5 @@
 import { Navigate } from "react-router-dom";
-import { useAuth } from "./ContextProvider";
+import { useAuth } from "./authConstants";
 
 const ProtectedRoutes = ({ children, roles }) => {
 

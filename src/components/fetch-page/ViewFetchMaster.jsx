@@ -258,6 +258,7 @@ const ViewFetchMaster = () => {
         break;
       case 'direct':
         handleCorporateClick(item);
+        break;
       default:
         break;
     }

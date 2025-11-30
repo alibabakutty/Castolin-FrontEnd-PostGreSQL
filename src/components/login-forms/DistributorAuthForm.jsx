@@ -1,18 +1,15 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import { useAuth } from "../../context/ContextProvider";
-import { useCredentials } from "../hooks-credentials-history/userCredentials";
+import { useAuth } from "../../context/authConstants";
 
 const DistributorAuthForm = () => {
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [showCredentialsHistory, setShowCredentialsHistory] = useState(false);
 
   const { loginDistributor } = useAuth();
-  const { credentialsHistory, saveCredentials, removeCredential } = useCredentials('distributor');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -34,8 +31,6 @@ const DistributorAuthForm = () => {
       const result = await loginDistributor(loginEmail, password);
       
       if (result.success) {
-        // Save credentials after successful login
-        await saveCredentials(loginEmail, password, username);
         
         if (result.role === 'distributor') {
           navigate('/distributor');
@@ -56,20 +51,6 @@ const DistributorAuthForm = () => {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const useCredential = (credential) => {
-    setUsername(credential.email || credential.username || '');
-    setPassword(credential.password);
-    setShowCredentialsHistory(false);
-  };
-
-  const handleRemoveCredential = (email) => {
-    removeCredential(email);
-    toast.info("Credential removed from history", {
-      position: 'bottom-right',
-      autoClose: 3000,
-    });
   };
 
   const isFormValid = () => {

@@ -10,7 +10,7 @@ const Unauthorized = () => {
       </div>
       <div>
         Please click Redirect to Login.
-        <button className="bg-red-400 px-2 py-1 rounded text-white ml-2" onClick={(e) => navigate("/")}>
+        <button className="bg-red-400 px-2 py-1 rounded text-white ml-2" onClick={() => navigate("/")}>
           Redirect{" "}
         </button>
       </div>

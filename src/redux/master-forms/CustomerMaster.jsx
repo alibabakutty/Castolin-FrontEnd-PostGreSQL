@@ -46,7 +46,7 @@ const CustomerMaster = () => {
 
   const handleKeyDown = (e, index) => {
     const key = e.key;
-    const { value, selectionStart, selectionEnd } = e.target;
+    const { value, selectionStart } = e.target;
 
     if (key === 'Enter') {
       e.preventDefault();

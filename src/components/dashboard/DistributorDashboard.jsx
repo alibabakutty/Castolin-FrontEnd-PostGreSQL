@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Order from '../orders-page/Order';
 import { logout } from '../../auth/auth';
-import { useAuth } from '../../context/ContextProvider';
 import { toast } from 'react-toastify';
 import ViewFetchDistributor from '../reports-page/ViewFetchDistributor';
+import { useAuth } from '../../context/authConstants';
 
 const DistributorDashboard = () => {
   const [currentPage, setCurrentPage] = useState('dashboard');

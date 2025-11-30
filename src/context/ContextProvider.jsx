@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import api from '../services/api';
 import { auth } from '../auth/firebaseConfig';
 import {
@@ -7,10 +7,7 @@ import {
   signInWithEmailAndPassword,
   signOut,
 } from 'firebase/auth';
-
-const AuthContext = createContext();
-
-export const useAuth = () => useContext(AuthContext);
+import { AuthContext } from './authConstants';
 
 const ContextProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -57,7 +54,7 @@ const ContextProvider = ({ children }) => {
                   distributorData = userData;
                 }
               }
-            } catch (error) {
+            } finally {
               console.warn(`${storedUserType} endpoint failed, trying all endpoints`);
               localStorage.removeItem('userType');
             }
@@ -88,11 +85,11 @@ const ContextProvider = ({ children }) => {
 
                   // Persist user type for next time
                   localStorage.setItem('userType', endpoint.type);
-                  break;
+                  break; // Stop loop if user found
                 }
-              } catch (error) {
-                // continue trying next endpoint
-                continue;
+              } catch (err) {
+                console.error(`Error fetching from ${endpoint.path}`, err);
+                // Automatically continues to next iteration
               }
             }
           }
@@ -331,7 +328,7 @@ const ContextProvider = ({ children }) => {
         message: res.data?.message,
         affectedRows: res.data?.affectedRows,
         adminReLogin: adminLoginResult.success,
-      }
+      };
     } catch (error) {
       console.error('Direct Order Firebase creation failed!', error);
       if (auth.currentUser && auth.currentUser.email === email) {
@@ -340,9 +337,9 @@ const ContextProvider = ({ children }) => {
       return {
         success: false,
         message: error.response?.data?.error || error.message,
-      }
+      };
     }
-  }
+  };
 
   // Add admin login function
   const loginAdmin = async (email = 'admin123@gmail.com', password = '12345678') => {

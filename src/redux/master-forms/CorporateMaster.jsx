@@ -1,12 +1,12 @@
 import { useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useAuth } from '../../context/ContextProvider';
 import { setModeCorporateData, updateFieldCorporateData } from '../slices/corporateSlice';
 import { fetchCorporateByUsercode } from '../thunks/corporateThunks';
 import { toast } from 'react-toastify';
 import LeftSideMenu from '../../components/right-side-button/LeftSideMenu';
 import RightSideButton from '../../components/right-side-button/RightSideButton';
+import { useAuth } from '../../context/authConstants';
 
 const CorporateMaster = () => {
   const { corporateData, mode } = useSelector(state => state.corporateData);
@@ -115,7 +115,7 @@ const CorporateMaster = () => {
             navigate(`/fetch-view-master/direct`);
           }, 10);
         } else {
-          toast.error(error.message || 'Failed to update direct order');
+          toast.error('Failed to update direct order');
         }
       } catch (error) {
         toast.error(error.message || 'Error updating direct order');

@@ -19,7 +19,7 @@ const OrderReportPage = () => {
   const executiveSelectRef = useRef(null);
   const quantityInputRef = useRef(null);
   const buttonRef = useRef(null);
-  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+  // const [windowWidth, setWindowWidth] = useState(window.innerWidth);
   const [database, setDatabase] = useState([]);
   const [itemOptions, setItemOptions] = useState([]); // Separate state for items
   const [orderData, setOrderData] = useState([]);
@@ -124,12 +124,12 @@ const OrderReportPage = () => {
     return `${year}-${month}-${day}`; // Returns "2025-10-31" for date input
   };
 
-  useEffect(() => {
-    const handleResize = () => setWindowWidth(window.innerWidth);
-    window.addEventListener('resize', handleResize);
+  // useEffect(() => {
+  //   const handleResize = () => setWindowWidth(window.innerWidth);
+  //   window.addEventListener('resize', handleResize);
 
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  //   return () => window.removeEventListener('resize', handleResize);
+  // }, []);
 
   useEffect(() => {
     const fetchStockItems = async () => {
@@ -180,8 +180,8 @@ const OrderReportPage = () => {
       const rate = Number(updatedRows[existingIndex].rate);
       const amt = qty * rate;
 
-      const discAmt = (amt * disc) / 100;
-      const splDiscAmt = ((amt - discAmt) * splDisc) / 100;
+      const discAmt = (amt * defaultDiscount) / 100;
+      const splDiscAmt = ((amt - discAmt) * defaultSplDiscount) / 100;
       const totalDisc = discAmt + splDiscAmt;
 
       updatedRows[existingIndex].itemQty = qty;
@@ -400,61 +400,67 @@ const OrderReportPage = () => {
   };
 
   // Function to handle discount percentage change
-  const handleDiscChange = (index, value) => {
-    // Allow only numbers and decimal point
-    const decimalRegex = /^\d*\.?\d*$/;
-    if (value !== '' && !decimalRegex.test(value)) {
-      return; // Don't update if invalid
-    }
+const handleDiscChange = (index, value) => {
+  // Allow only numbers and decimal point
+  const decimalRegex = /^\d*\.?\d*$/;
+  if (value !== '' && !decimalRegex.test(value)) {
+    return; // Don't update if invalid
+  }
 
-    const updatedRows = [...orderData];
-    const row = updatedRows[index];
+  const updatedRows = [...orderData];
+  const row = updatedRows[index];
 
-    const disc = Number(value) || 0;
-    const gross = row.amount;
-    const qty = Number(row.itemQty) || 1;
+  const disc = Number(value) || 0;
+  const gross = row.amount;
+  const qty = Number(row.itemQty) || 1;
 
-    // Recalculate discount amounts
-    const discAmt = (gross * disc) / 100;
-    const splDiscAmt = ((gross - discAmt) * row.splDisc) / 100;
-    const totalDisc = discAmt + splDiscAmt;
+  // FIX: Use defaultSplDiscount when row.splDisc is not available
+  const currentSplDisc = Number(row.splDisc || defaultSplDiscount);
+  
+  // Recalculate discount amounts
+  const discAmt = (gross * disc) / 100;
+  const splDiscAmt = ((gross - discAmt) * currentSplDisc) / 100;
+  const totalDisc = discAmt + splDiscAmt;
 
-    updatedRows[index].disc = value; // Keep as string for proper display
-    updatedRows[index].discAmt = discAmt;
-    updatedRows[index].splDiscAmt = splDiscAmt;
-    updatedRows[index].netRate = qty > 0 ? (gross - totalDisc) / qty : 0;
-    updatedRows[index].grossAmount = gross - totalDisc;
+  updatedRows[index].disc = value; // Keep as string for proper display
+  updatedRows[index].discAmt = discAmt;
+  updatedRows[index].splDiscAmt = splDiscAmt;
+  updatedRows[index].netRate = qty > 0 ? (gross - totalDisc) / qty : 0;
+  updatedRows[index].grossAmount = gross - totalDisc;
 
-    setOrderData(updatedRows);
-  };
+  setOrderData(updatedRows);
+};
 
   // Function to handle special discount percentage change
-  const handleSplDiscChange = (index, value) => {
-    // Allow only numbers and decimal point
-    const decimalRegex = /^\d*\.?\d*$/;
-    if (value !== '' && !decimalRegex.test(value)) {
-      return; // Don't update if invalid
-    }
+const handleSplDiscChange = (index, value) => {
+  // Allow only numbers and decimal point
+  const decimalRegex = /^\d*\.?\d*$/;
+  if (value !== '' && !decimalRegex.test(value)) {
+    return; // Don't update if invalid
+  }
 
-    const updatedRows = [...orderData];
-    const row = updatedRows[index];
+  const updatedRows = [...orderData];
+  const row = updatedRows[index];
 
-    const splDisc = parseFloat(value) || 0;
-    const gross = Number(row.amount) || 0;
-    const qty = Number(row.itemQty) || 1;
-    const discAmt = (gross * Number(row.disc || 0)) / 100;
+  const splDisc = parseFloat(value) || 0;
+  const gross = Number(row.amount) || 0;
+  const qty = Number(row.itemQty) || 1;
+  
+  // FIX: Use defaultDiscount when row.disc is not available
+  const currentDisc = Number(row.disc || defaultDiscount);
+  const discAmt = (gross * currentDisc) / 100;
 
-    // Recalculate special discount amounts
-    const splDiscAmt = ((gross - discAmt) * splDisc) / 100;
-    const totalDisc = discAmt + splDiscAmt;
+  // Recalculate special discount amounts
+  const splDiscAmt = ((gross - discAmt) * splDisc) / 100;
+  const totalDisc = discAmt + splDiscAmt;
 
-    updatedRows[index].splDisc = value; // Keep as string for proper display
-    updatedRows[index].splDiscAmt = splDiscAmt;
-    updatedRows[index].netRate = qty > 0 ? (gross - totalDisc) / qty : 0;
-    updatedRows[index].grossAmount = gross - totalDisc;
+  updatedRows[index].splDisc = value; // Keep as string for proper display
+  updatedRows[index].splDiscAmt = splDiscAmt;
+  updatedRows[index].netRate = qty > 0 ? (gross - totalDisc) / qty : 0;
+  updatedRows[index].grossAmount = gross - totalDisc;
 
-    setOrderData(updatedRows);
-  };
+  setOrderData(updatedRows);
+};
 
   const handleSubmit = e => {
     e.preventDefault();
@@ -527,6 +533,8 @@ const OrderReportPage = () => {
     setStatus('pending');
     setRemarks('');
     setOrderData([]);
+    setDefaultDiscount(0);
+    setDefaultSplDiscount(0);
 
     // Reset Select components to their default state
     if (customerSelectRef.current) {
@@ -615,69 +623,69 @@ const OrderReportPage = () => {
       .replace(/^₹/, '₹ ');
   };
 
-  const customStyles = {
-    control: (base, state) => {
-      let customWidth = '500px';
-      if (windowWidth <= 768) {
-        customWidth = '100%';
-      } else if (windowWidth <= 1024) {
-        customWidth = '200px';
-      } else if (windowWidth <= 1280) {
-        customWidth = '250px';
-      } else if (windowWidth <= 1366) {
-        customWidth = '300px';
-      }
-      return {
-        ...base,
-        minHeight: '26px',
-        height: '26px',
-        padding: '0 1px',
-        width: customWidth,
-        backgroundColor: '#E9EFEC',
-        borderColor: '#932F67',
-        boxShadow: 'none',
-      };
-    },
-    valueContainer: base => ({
-      ...base,
-      padding: '0px 4px',
-      height: '20px',
-    }),
-    menu: base => {
-      let customWidth = '550px';
-      if (windowWidth <= 768) {
-        customWidth = '100%';
-      } else if (windowWidth <= 1024) {
-        customWidth = '350px';
-      } else if (windowWidth <= 1366) {
-        customWidth = '400px';
-      }
-      return {
-        ...base,
-        width: customWidth,
-        overflowY: 'auto',
-        zIndex: 9999,
-        border: '1px solid #ddd',
-      };
-    },
-    option: (base, state) => ({
-      ...base,
-      padding: '8px 12px',
-      backgroundColor: state.isFocused ? '#f0f0f0' : 'white',
-      color: 'black',
-      cursor: 'pointer',
-    }),
-    menuList: base => ({
-      ...base,
-      padding: 0,
-      minHeight: '55vh',
-    }),
-    input: base => ({
-      ...base,
-      margin: 0,
-      padding: 0,
-    }),
-  };
+  // const customStyles = {
+  //   control: (base, state) => {
+  //     let customWidth = '500px';
+  //     if (windowWidth <= 768) {
+  //       customWidth = '100%';
+  //     } else if (windowWidth <= 1024) {
+  //       customWidth = '200px';
+  //     } else if (windowWidth <= 1280) {
+  //       customWidth = '250px';
+  //     } else if (windowWidth <= 1366) {
+  //       customWidth = '300px';
+  //     }
+  //     return {
+  //       ...base,
+  //       minHeight: '26px',
+  //       height: '26px',
+  //       padding: '0 1px',
+  //       width: customWidth,
+  //       backgroundColor: '#E9EFEC',
+  //       borderColor: '#932F67',
+  //       boxShadow: 'none',
+  //     };
+  //   },
+  //   valueContainer: base => ({
+  //     ...base,
+  //     padding: '0px 4px',
+  //     height: '20px',
+  //   }),
+  //   menu: base => {
+  //     let customWidth = '550px';
+  //     if (windowWidth <= 768) {
+  //       customWidth = '100%';
+  //     } else if (windowWidth <= 1024) {
+  //       customWidth = '350px';
+  //     } else if (windowWidth <= 1366) {
+  //       customWidth = '400px';
+  //     }
+  //     return {
+  //       ...base,
+  //       width: customWidth,
+  //       overflowY: 'auto',
+  //       zIndex: 9999,
+  //       border: '1px solid #ddd',
+  //     };
+  //   },
+  //   option: (base, state) => ({
+  //     ...base,
+  //     padding: '8px 12px',
+  //     backgroundColor: state.isFocused ? '#f0f0f0' : 'white',
+  //     color: 'black',
+  //     cursor: 'pointer',
+  //   }),
+  //   menuList: base => ({
+  //     ...base,
+  //     padding: 0,
+  //     minHeight: '55vh',
+  //   }),
+  //   input: base => ({
+  //     ...base,
+  //     margin: 0,
+  //     padding: 0,
+  //   }),
+  // };
 
   return (
     <div className="font-amasis p-3 bg-[#E9EFEC] border-2 h-screen">

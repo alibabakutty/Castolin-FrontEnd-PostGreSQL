@@ -3,10 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { logout } from '../../auth/auth';
 import CDAPage from '../CDAPage';
-import { useAuth } from '../../context/ContextProvider';
 import ViewFetchReport from '../reports-page/ViewFetchReport';
 import ViewItemFetchReport from '../reports-page/ViewItemFetchReport';
 import ViewPendingFetchReport from '../reports-page/ViewPendingFetchReport';
+import { useAuth } from '../../context/authConstants';
 
 const AdminDashboard = () => {
   const [currentPage, setCurrentPage] = useState('dashboard');

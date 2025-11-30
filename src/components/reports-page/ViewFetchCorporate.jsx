@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import Title from '../Title';
-import { useAuth } from '../../context/ContextProvider';
+import { useAuth } from '../../context/authConstants';
 
 const ViewFetchCorporate = ({ onBack }) => {
   const [allOrders, setAllOrders] = useState([]);

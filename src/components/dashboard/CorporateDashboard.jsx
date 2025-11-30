@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/ContextProvider';
 import Order from '../orders-page/Order';
 import { logout } from '../../auth/auth';
 import { toast } from 'react-toastify';
 import ViewFetchCorporate from '../reports-page/ViewFetchCorporate';
+import { useAuth } from '../../context/authConstants';
 
 const CorporateDashboard = () => {
   const [currentPage, setCurrentPage] = useState('dashboard');
