@@ -7,7 +7,6 @@ import MainPage from './components/MainPage';
 import AdminAuthForm from './components/login-forms/AdminAuthForm';
 import StockItemMaster from './redux/master-forms/StockItemMaster';
 import ViewFetchReport from './components/reports-page/ViewFetchReport';
-import OrederReportPage from './components/reports-page/OrederReportPage';
 import ViewFetchMaster from './components/fetch-page/ViewFetchMaster';
 import CorporateAuthForm from './components/login-forms/CorporateAuthForm';
 import DistributorDashboard from './components/dashboard/DistributorDashboard';
@@ -17,9 +16,9 @@ import CorporateMaster from './redux/master-forms/CorporateMaster';
 import CorporateDashboard from './components/dashboard/CorporateDashboard';
 import ViewFetchCorporate from './components/reports-page/ViewFetchCorporate';
 import ViewFetchDistributor from './components/reports-page/ViewFetchDistributor';
-import OrderReportPage from './components/reports-page/OrederReportPage';
 import ViewItemFetchReport from './components/reports-page/ViewItemFetchReport';
 import ViewPendingFetchReport from './components/reports-page/ViewPendingFetchReport';
+import OrderReportPage from './components/reports-page/OrderReportPage';
 
 function App() {
   return (
@@ -156,7 +155,7 @@ function App() {
         {/* Approved order report */}
         <Route path='/order-report-approved/:orderNumber' element={
           <ProtectedRoutes roles={['admin']}>
-            <OrederReportPage />
+            <OrderReportPage />
           </ProtectedRoutes>
         } />
         {/* Corporate order report */}

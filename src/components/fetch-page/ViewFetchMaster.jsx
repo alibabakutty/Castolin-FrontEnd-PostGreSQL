@@ -26,9 +26,9 @@ const ViewFetchMaster = () => {
       fields: {
         primary: 'stock_item_name',
         code: 'item_code',
-        category: 'category',
-        quantity: 'quantity',
-        price: 'price',
+        category: 'hsn',
+        quantity: 'gst',
+        price: 'rate',
         description: 'description',
       },
     },
@@ -41,8 +41,8 @@ const ViewFetchMaster = () => {
       fields: {
         primary: 'customer_name',
         code: 'customer_code',
-        email: 'email',
-        phone: 'phone',
+        email: 'mobile_number',
+        phone: 'customer_type',
         address: 'address',
         company: 'company_name',
       },
@@ -275,12 +275,16 @@ const ViewFetchMaster = () => {
         case 'inventory':
           return (
             <div className="w-full flex items-center text-[12px]">
-              {/* Code - minimal width */}
+              {/* Code - 12% */}
               <div className="w-[15%] text-gray-800 truncate">{item.item_code}</div>
-              {/* Name - double width */}
+              {/* Name - 50% (Increased for full name display) */}
               <div className="w-[50%] text-gray-800 truncate">{item.stock_item_name}</div>
-              <div className="w-[20%] text-gray-800 truncate text-center">{item.hsn}</div>
-              <div className="w-[20%] text-gray-800 truncate text-right">
+              {/* HSN - 10% (Reduced) */}
+              <div className="w-[10%] text-gray-800 truncate text-center">{item.hsn}</div>
+              {/* GST - 10% (Reduced) */}
+              <div className="w-[10%] text-gray-800 truncate text-center">{item.gst} %</div>
+              {/* Rate - 18% (Reduced) */}
+              <div className="w-[18%] text-gray-800 truncate text-right">
                 ₹ {parseFloat(item.rate || 0).toFixed(2)}
               </div>
             </div>
@@ -289,25 +293,33 @@ const ViewFetchMaster = () => {
         case 'customer':
           return (
             <div className="w-full flex items-center text-[12px]">
-              {/* Code - minimal width */}
-              <div className="w-[15%] text-gray-800 truncate">{item.customer_code}</div>
-              {/* Name - double width */}
-              <div className="w-[50%] text-gray-800 truncate">{item.customer_name}</div>
-              <div className="w-[20%] text-gray-800 truncate">{item.mobile_number}</div>
-              <div className="w-[20%] text-gray-800 truncate">{item.role.toUpperCase()}</div>
+              {/* Code - 20% */}
+              <div className="w-[20%] text-gray-800 truncate">{item.customer_code}</div>
+              {/* Name - 40% */}
+              <div className="w-[45%] text-gray-800 truncate">{item.customer_name}</div>
+              {/* Mobile - 20% */}
+              <div className="w-[17%] text-gray-800 truncate">{item.mobile_number}</div>
+              {/* Type - 20% */}
+              <div className="w-[15%] text-gray-800 truncate">{item.role?.toUpperCase()}</div>
             </div>
           );
 
         case 'distributor':
           return (
             <div className="w-full flex items-center text-[12px]">
-              {/* Code - minimal width */}
-              <div className="w-[15%] text-gray-800 truncate">{item.customer_code}</div>
-              {/* Name - double width */}
+              {/* Code - 12% (Reduced) */}
+              <div className="w-[12%] text-gray-800 truncate">{item.customer_code}</div>
+              {/* Name - 50% (Increased for full name display) */}
               <div className="w-[50%] text-gray-800 truncate">{item.customer_name}</div>
-              <div className="w-[20%] text-gray-800 truncate">{item.mobile_number}</div>
-              <div className="w-[20%] text-gray-800 truncate">
-                {item.customer_type.toUpperCase()}
+              {/* Mobile - 15% (Reduced) */}
+              <div className="w-[15%] text-gray-800 truncate">{item.mobile_number}</div>
+              {/* Type - 13% (Reduced) */}
+              <div className="w-[13%] text-gray-800 truncate">
+                {item.customer_type?.toUpperCase()}
+              </div>
+              {/* Status - 10% (Reduced) */}
+              <div className="w-[10%] text-gray-800 truncate text-center">
+                {item.status?.toUpperCase()}
               </div>
             </div>
           );
@@ -315,13 +327,19 @@ const ViewFetchMaster = () => {
         case 'direct':
           return (
             <div className="w-full flex items-center text-[12px]">
-              {/* Code - minimal width */}
-              <div className="w-[15%] text-gray-800 truncate">{item.customer_code}</div>
-              {/* Name - double width */}
+              {/* Code - 12% (Reduced) */}
+              <div className="w-[12%] text-gray-800 truncate">{item.customer_code}</div>
+              {/* Name - 50% (Increased for full name display) */}
               <div className="w-[50%] text-gray-800 truncate">{item.customer_name}</div>
-              <div className="w-[20%] text-gray-800 truncate">{item.mobile_number}</div>
-              <div className="w-[20%] text-gray-800 truncate">
-                {item.customer_type.toUpperCase()}
+              {/* Mobile - 15% (Reduced) */}
+              <div className="w-[15%] text-gray-800 truncate">{item.mobile_number}</div>
+              {/* Type - 13% (Reduced) */}
+              <div className="w-[13%] text-gray-800 truncate">
+                {item.customer_type?.toUpperCase()}
+              </div>
+              {/* Status - 10% (Reduced) */}
+              <div className="w-[10%] text-gray-800 truncate text-center">
+                {item.status?.toUpperCase()}
               </div>
             </div>
           );
@@ -397,13 +415,6 @@ const ViewFetchMaster = () => {
             </ul>
           )}
         </div>
-        {/* Results count */}
-        <div className="p-2 border-t border-gray-300 bg-gray-50">
-          <p className="text-xs text-gray-600 text-center">
-            Showing {filteredData.length} of {data.length} {currentModule.itemName}
-            {searchTerm && ` for "${searchTerm}"`}
-          </p>
-        </div>
       </div>
     );
   };
@@ -434,7 +445,7 @@ const ViewFetchMaster = () => {
             </p>
             <input
               type="text"
-              placeholder={currentModule?.searchPlaceholder || 'Search...'}
+              placeholder={''}
               value={searchTerm}
               ref={searchInputRef}
               onChange={handleSearchChange}
@@ -447,19 +458,70 @@ const ViewFetchMaster = () => {
               List of {typeNames[type] || 'Items'}
             </h2>
             <div className="border border-b-slate-400 flex justify-between px-2 py-1">
-              {/* Use grid layout with Name taking double width */}
+              {/* Header columns */}
               <div className="w-full flex text-xs font-medium">
-                {/* Code column - minimal width */}
-                <div className="w-[15%]">Code</div>
-                {/* Name column - double width */}
-                <div className="w-[45%]">Name</div>
+                {/* Code column */}
+                <div className={`${
+                  type === 'customer' ? 'w-[20%]' : 
+                  (type === 'inventory' || type === 'distributor' || type === 'direct') ? 'w-[12%]' : 'w-[15%]'
+                }`}>
+                  {type === 'customer'
+                    ? 'Customer Code'
+                    : type === 'inventory'
+                    ? 'Product Code'
+                    : type === 'distributor'
+                    ? 'Dist. Code'
+                    : 'Code'}
+                </div>
+                
+                {/* Name column - Increased width for better name display */}
+                <div className={`${
+                  type === 'customer' ? 'w-[40%] pl-7' : 
+                  (type === 'inventory' || type === 'distributor' || type === 'direct') ? 'w-[50%] text-center' : 'w-[30%]'
+                }`}>
+                  {type === 'customer'
+                    ? 'Customer Name'
+                    : type === 'inventory'
+                    ? 'Product Name'
+                    : type === 'distributor'
+                    ? 'Distributor Name'
+                    : 'Name'}
+                </div>
 
                 {/* Conditional columns */}
-                {type !== 'inventory' && <div className="w-[20%]">Mobile Number</div>}
-                {type !== 'inventory' && <div className="w-[20%]">Type</div>}
+                {type !== 'inventory' && (
+                  <div className={`${
+                    type === 'customer' ? 'w-[20%] pl-4' : 
+                    (type === 'distributor' || type === 'direct') ? 'w-[15%]' : 'w-[20%]'
+                  }`}>
+                    Mobile Number
+                  </div>
+                )}
 
-                {type === 'inventory' && <div className="w-[20%] text-center">HSN</div>}
-                {type === 'inventory' && <div className="w-[20%] text-center">Rate</div>}
+                {type !== 'inventory' && (
+                  <div className={`${
+                    type === 'customer' ? 'w-[20%] pl-3' : 
+                    (type === 'distributor' || type === 'direct') ? 'w-[13%]' : 'w-[20%]'
+                  }`}>
+                    {type === 'customer' ? 'Role' : 'Type'}
+                  </div>
+                )}
+
+                {/* Fifth column for non-customer types */}
+                {type !== 'customer' && (
+                  <>
+                    {type === 'inventory' && (
+                      <>
+                        <div className="w-[10%] text-center">HSN Code</div>
+                        <div className="w-[10%] text-center">GST Rate</div>
+                        <div className="w-[18%] text-right">Rate Amount</div>
+                      </>
+                    )}
+                    {(type === 'distributor' || type === 'direct') && (
+                      <div className="w-[10%] text-center">Status</div>
+                    )}
+                  </>
+                )}
               </div>
             </div>
             {renderContent()}
