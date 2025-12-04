@@ -16,6 +16,7 @@ const Order = ({ onBack }) => {
   const [customerOptions, setCustomerOptions] = useState([]);
   const [orderData, setOrderData] = useState([]);
   const [remarks, setRemarks] = useState('');
+
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const customerSelectRef = useRef(null);
   const isSubmitttingRef = useRef(false);
@@ -195,6 +196,9 @@ const Order = ({ onBack }) => {
           gst: selected?.gst || '18',
           sgst: '', // Will calculate based on state
           cgst: '', // Will calculate based on state
+          gst: selected?.gst || '18', // Keep GST percentage
+          sgst: '', // Will calculate amount
+          cgst: '', // Will calculate amount
           igst: selected?.igst || '',
         };
 
@@ -206,10 +210,6 @@ const Order = ({ onBack }) => {
           const customerState = isDistributorRoute
             ? distributorUser?.state || ''
             : selectedCustomer?.state || '';
-
-          // Calculate GST based on state
-          const gstPercentage = Number(selected?.gst || 18);
-          const gstAmount = amount * (gstPercentage / 100);
 
           // If state is "Tamil Nadu", split GST into SGST and CGST
           if (
@@ -226,6 +226,15 @@ const Order = ({ onBack }) => {
             updated.cgst = ''; // Clear CGST for inter-state
             updated.igst = gstAmount.toFixed(2);
           }
+          // Calculate GST AMOUNT values (not percentages)
+          const gstPercentage = Number(selected?.gst || 18);
+          const gstAmount = amount * (gstPercentage / 100);
+          const halfGST = gstAmount / 2;
+
+          // Set SGST and CGST as AMOUNT values (not percentages)
+          updated.sgst = halfGST.toFixed(2);
+          updated.cgst = halfGST.toFixed(2);
+
         }
 
         return updated;
@@ -246,6 +255,9 @@ const Order = ({ onBack }) => {
       updatedRows[index].gst = selected?.gst || '18';
       updatedRows[index].sgst = '';
       updatedRows[index].cgst = '';
+      updatedRows[index].gst = selected?.gst || '18'; // Keep GST percentage
+      updatedRows[index].sgst = ''; // Will calculate amount
+      updatedRows[index].cgst = ''; // Will calculate amount
       updatedRows[index].igst = selected?.igst || '';
       updatedRows[index].uom = selected?.uom || "No's";
 
@@ -258,9 +270,6 @@ const Order = ({ onBack }) => {
           ? distributorUser?.state || ''
           : selectedCustomer?.state || '';
 
-        // Calculate GST based on state
-        const gstPercentage = Number(selected?.gst || 18);
-        const gstAmount = amount * (gstPercentage / 100);
 
         // If state is "Tamil Nadu", split GST into SGST and CGST
         if (customerState.toLowerCase() === 'tamil nadu' || customerState.toLowerCase() === 'tn') {
@@ -274,6 +283,14 @@ const Order = ({ onBack }) => {
           updatedRows[index].cgst = ''; // Clear CGST for inter-state
           updatedRows[index].igst = gstAmount.toFixed(2);
         }
+        // Calculate GST AMOUNT values (not percentages)
+        const gstPercentage = Number(selected?.gst || 18);
+        const gstAmount = amount * (gstPercentage / 100);
+        const halfGST = gstAmount / 2;
+
+        // Set SGST and CGST as AMOUNT values (not percentages)
+        updatedRows[index].sgst = halfGST.toFixed(2);
+        updatedRows[index].cgst = halfGST.toFixed(2);
       }
 
       setOrderData(updatedRows);
@@ -298,6 +315,7 @@ const Order = ({ onBack }) => {
         state: distributorUser.state || '',
       });
     }
+
   };
 
   const handleAddRow = () => {
@@ -330,7 +348,11 @@ const Order = ({ onBack }) => {
 
     setOrderData(prev => [...prev, newRow]);
 
+
     // Reset editing row but keep customer state logic in mind
+
+    // Reset editing row
+
     setEditingRow({
       item: null,
       delivery_date: '',
@@ -343,12 +365,26 @@ const Order = ({ onBack }) => {
       sgst: '',
       cgst: '',
       igst: '',
+
     });
 
     // Focus on the new editing row's select
     setTimeout(() => {
       editingRowSelectRef.current?.focus();
     }, 100);
+
+    // Reset editing row refs
+    editingRowInputRefs.current = {};
+
+    // Focus on the new editing row's select
+    setTimeout(() => {
+      editingRowSelectRef.current?.focus();
+    }, 100);
+
+    toast.info('Item added successfully!', {
+      position: 'bottom-right',
+      autoClose: 3000,
+    });
   };
 
   const handleFieldChange = (field, value, index) => {
@@ -370,9 +406,6 @@ const Order = ({ onBack }) => {
             ? distributorUser?.state || ''
             : selectedCustomer?.state || '';
 
-          // Calculate GST based on state
-          const gstAmount = amount * (Number(gstPercentage || 18) / 100);
-
           // If state is "Tamil Nadu", split GST into SGST and CGST
           if (
             customerState.toLowerCase() === 'tamil nadu' ||
@@ -388,6 +421,14 @@ const Order = ({ onBack }) => {
             updated.cgst = '';
             updated.igst = gstAmount.toFixed(2);
           }
+          // Calculate GST AMOUNT values
+          const gstAmount = amount * (Number(gstPercentage || 18) / 100);
+          const halfGST = gstAmount / 2;
+
+          // Set SGST and CGST as AMOUNT values
+          updated.sgst = halfGST.toFixed(2);
+          updated.cgst = halfGST.toFixed(2);
+
         }
 
         return updated;
@@ -410,9 +451,6 @@ const Order = ({ onBack }) => {
           ? distributorUser?.state || ''
           : selectedCustomer?.state || '';
 
-        // Calculate GST based on state
-        const gstAmount = amount * (Number(gstPercentage || 18) / 100);
-
         // If state is "Tamil Nadu", split GST into SGST and CGST
         if (customerState.toLowerCase() === 'tamil nadu' || customerState.toLowerCase() === 'tn') {
           const halfGST = gstAmount / 2;
@@ -425,6 +463,14 @@ const Order = ({ onBack }) => {
           updatedRows[index].cgst = '';
           updatedRows[index].igst = gstAmount.toFixed(2);
         }
+        // Calculate GST AMOUNT values
+        const gstAmount = amount * (Number(gstPercentage || 18) / 100);
+        const halfGST = gstAmount / 2;
+
+        // Set SGST and CGST as AMOUNT values
+        updatedRows[index].sgst = halfGST.toFixed(2);
+        updatedRows[index].cgst = halfGST.toFixed(2);
+
       }
 
       setOrderData(updatedRows);
@@ -1058,6 +1104,7 @@ const Order = ({ onBack }) => {
       totalAmount: totalAmountValue,
     });
   }, [orderData, editingRow, selectedCustomer, isDistributorRoute, distributorUser]);
+
 
   const formatCurrency = value => {
     return new Intl.NumberFormat('en-IN', {

@@ -3,9 +3,33 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "main": "electron/electron.js",
+  "build": {
+    "appId": "com.castoline_frontend.app",
+    "productName": "Castoline",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "dist/**",
+      "electron/**"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "public/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    }
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "electron": "electron",
+    "make-exe": "vite build && electron-builder",
     "lint": "eslint .",
     "preview": "vite preview"
   },
@@ -28,6 +52,8 @@
     "@types/react": "^19.1.16",
     "@types/react-dom": "^19.1.9",
     "@vitejs/plugin-react": "^5.0.4",
+    "electron": "^39.2.4",
+    "electron-builder": "^26.0.12",
     "eslint": "^9.36.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.22",
