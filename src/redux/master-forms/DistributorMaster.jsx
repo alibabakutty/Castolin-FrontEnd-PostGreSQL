@@ -100,6 +100,7 @@ const DistributorMaster = () => {
             mobile_number: distributorData.mobile_number,
             customer_type: distributorData.customer_type,
             role: distributorData.customer_type,
+            status: 'active',
             email: distributorData.email,
             password: distributorData.password,
           },

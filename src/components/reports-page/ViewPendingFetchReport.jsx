@@ -3,7 +3,7 @@ import Title from '../Title';
 import api from '../../services/api';
 import { useNavigate } from 'react-router-dom';
 
-const ViewPendingFetchReport = ({ onBack }) => {
+const ViewPendingFetchReport = ({ onBack }) => { 
   const [allOrders, setAllOrders] = useState([]);
   const [filteredOrders, setFilteredOrders] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');

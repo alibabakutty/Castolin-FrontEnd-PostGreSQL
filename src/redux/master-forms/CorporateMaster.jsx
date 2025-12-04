@@ -98,6 +98,7 @@ const CorporateMaster = () => {
             customer_name: corporateData.customer_name,
             mobile_number: corporateData.mobile_number,
             customer_type: corporateData.customer_type,
+            staus: 'active',
             email: corporateData.email,
             password: corporateData.password,
           },

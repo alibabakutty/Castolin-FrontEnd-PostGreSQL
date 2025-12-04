@@ -135,7 +135,6 @@ const CDAPage = ({ onBack, moduleType }) => {
               </svg>
               {currentModule.viewText}
             </button>
-
           </div>
         </div>
       </div>

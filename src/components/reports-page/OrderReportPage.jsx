@@ -25,7 +25,7 @@ const OrderReportPage = () => {
   const executiveSelectRef = useRef(null);
   const quantityInputRef = useRef(null);
   const buttonRef = useRef(null);
-  // const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
   const [database, setDatabase] = useState([]);
   const [itemOptions, setItemOptions] = useState([]); // Separate state for items
   const [orderData, setOrderData] = useState([]);
@@ -141,12 +141,12 @@ const OrderReportPage = () => {
     return `${year}-${month}-${day}`; // Returns "2025-10-31" for date input
   };
 
-  // useEffect(() => {
-  //   const handleResize = () => setWindowWidth(window.innerWidth);
-  //   window.addEventListener('resize', handleResize);
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
 
-  //   return () => window.removeEventListener('resize', handleResize);
-  // }, []);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     const fetchStockItems = async () => {
@@ -445,11 +445,18 @@ const OrderReportPage = () => {
     return true; // validation passed
   };
 
-  // Format for display - show as whole number
   const formatQuantityForDisplay = quantity => {
-    const num = Number(quantity) || 0;
-    // Remove any decimal places for display
-    return Math.floor(num).toString();
+    if (quantity === null || quantity === undefined) return '0';
+
+    let str = quantity.toString().trim();
+
+    // remove commas
+    str = str.replace(/,/g, '');
+
+    // keep only part before decimal
+    const beforeDecimal = str.split('.')[0];
+
+    return beforeDecimal === '' ? '0' : beforeDecimal;
   };
 
   // Function to handle discount percentage change
@@ -677,7 +684,7 @@ const OrderReportPage = () => {
   };
 
   const customStyles = {
-    control: (base, state) => {
+    control: (base) => {
       let customWidth = '500px';
       if (windowWidth <= 768) {
         customWidth = '100%';
@@ -1028,10 +1035,10 @@ const OrderReportPage = () => {
                 <td className="font-medium text-sm border border-gray-300 py-0.5 px-2 w-[95px]">
                   Item Code
                 </td>
-                <td className="font-medium text-sm border border-gray-300 py-0.5 px-2 w-[350px] text-center">
+                <td className="font-medium text-sm border border-gray-300 py-0.5 px-2 w-[250px] text-center">
                   Product Name
                 </td>
-                <td className="font-medium text-sm border border-gray-300 py-0.5 px-2 text-right w-8">
+                <td className="font-medium text-sm border border-gray-300 py-0.5 text-center w-24">
                   Qty
                 </td>
                 <td className="font-medium text-sm border border-gray-300 py-0.5 px-0.3">UOM</td>
@@ -1212,8 +1219,6 @@ const OrderReportPage = () => {
                   {/* <td className="w-10 border"></td> */}
 
                   <td className="text-right border w-12 px-1">{formatCurrency(totals.amount)}</td>
-
-                  
 
                   {/* <td className="text-right border w-32 px-1"></td> */}
 

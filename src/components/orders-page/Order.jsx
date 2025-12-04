@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { AiFillDelete, AiFillExclamationCircle, AiOutlineArrowLeft } from 'react-icons/ai';
+import { AiFillDelete, AiFillPlusCircle, AiOutlineArrowLeft } from 'react-icons/ai';
 import Select from 'react-select';
 import { toast } from 'react-toastify';
 import api from '../../services/api';
@@ -8,43 +8,59 @@ import { useAuth } from '../../context/authConstants';
 
 const Order = ({ onBack }) => {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [item, setItem] = useState(null);
   const [customerName, setCustomerName] = useState(null);
-  const [quantity, setQuantity] = useState('');
   const [orderNumber, setOrderNumber] = useState('');
-  const [deliveryDate, setDeliveryDate] = useState('');
-  const [deliveryMode, setDeliveryMode] = useState('');
-  const [transporterName, setTransporterName] = useState('');
-  const itemSelectRef = useRef(null);
-  const customerSelectRef = useRef(null);
-  const deliveryDateRef = useRef(null);
-  const deliveryModeRef = useRef(null);
-  const transporterNameRef = useRef(null);
-  const quantityInputRef = useRef(null);
-  const buttonRef = useRef(null);
-  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+  // const [windowWidth, setWindowWidth] = useState(window.innerWidth);
   const [database, setDatebase] = useState([]);
   const [itemOptions, setItemOptions] = useState([]);
   const [customerOptions, setCustomerOptions] = useState([]);
   const [orderData, setOrderData] = useState([]);
   const [remarks, setRemarks] = useState('');
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const customerSelectRef = useRef(null);
   const isSubmitttingRef = useRef(false);
   const navigate = useNavigate();
+
+  // Refs for keyboard navigation - separate arrays for each row type
+  const inputRefs = useRef([]);
+  const selectRefs = useRef([]);
+  // Special refs for editing row
+  const editingRowInputRefs = useRef({});
+  const editingRowSelectRef = useRef(null);
+  const addButtonRef = useRef(null);
 
   const { distributorUser } = useAuth();
 
   const location = useLocation();
-
   const isDistributorRoute = location.pathname.includes('/distributor');
 
-  const formatDate = dateString => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
-    return `${day}-${month}-${year}`;
-  };
+  // Add a new empty row for data entry
+  const [editingRow, setEditingRow] = useState({
+    item: null,
+    delivery_date: '',
+    delivery_mode: '',
+    quantity: '',
+    rate: '',
+    amount: '',
+    hsn: '',
+    gst: '',
+    sgst: '',
+    cgst: '',
+    igst: '',
+  });
+
+  // Define column structure for keyboard navigation
+  const totalCols = 15; // Total number of editable columns (excluding S.No and Action)
+  const actionColumnIndex = 14; // Action column index
+
+  // const formatDate = dateString => {
+  //   if (!dateString) return '';
+  //   const date = new Date(dateString);
+  //   const day = String(date.getDate()).padStart(2, '0');
+  //   const month = String(date.getMonth() + 1).padStart(2, '0');
+  //   const year = date.getFullYear();
+  //   return `${day}-${month}-${year}`;
+  // };
 
   useEffect(() => {
     const handleKeyDown = e => {
@@ -65,27 +81,33 @@ const Order = ({ onBack }) => {
     };
   }, [onBack, navigate]);
 
+  // Focus on first field when component mounts
   useEffect(() => {
-    if (location.pathname.includes('/distributor') && itemSelectRef.current) {
-      itemSelectRef.current.focus();
-    } else if (location.pathname.includes('/corporate') && customerSelectRef.current) {
-      customerSelectRef.current.focus();
+    if (!isDistributorRoute && customerSelectRef.current) {
+      setTimeout(() => {
+        customerSelectRef.current.focus();
+      }, 100);
+    } else if (isDistributorRoute && editingRowSelectRef.current) {
+      setTimeout(() => {
+        editingRowSelectRef.current.focus();
+      }, 100);
     }
-  }, [location.pathname]);
+  }, [isDistributorRoute]);
 
   const [totals, setTotals] = useState({
     qty: 0,
     amount: 0,
+    sgstAmt: 0,
+    cgstAmt: 0,
+    igstAmt: 0,
     netAmt: 0,
     grossAmt: 0,
+    totalAmount: 0,
   });
 
-  // Function to generate order number
   const generateOrderNumber = () => {
     const today = new Date();
     const currentDate = today.toISOString().split('T')[0];
-
-    // Get last order number from localStorage
     const lastOrder = localStorage.getItem('lastOrder');
 
     if (lastOrder) {
@@ -93,30 +115,23 @@ const Order = ({ onBack }) => {
       const lastOrderDate = lastOrderData.date;
       const lastOrderNumber = lastOrderData.orderNumber;
 
-      // If same day, increment the sequence
       if (lastOrderDate === currentDate) {
-        // Extract the sequence number (last part after the last hyphen)
         const parts = lastOrderNumber.split('-');
         const lastSequence = parseInt(parts[parts.length - 1]);
         const newSequence = (lastSequence + 1).toString().padStart(4, '0');
-
         const day = today.getDate().toString().padStart(2, '0');
         const month = (today.getMonth() + 1).toString().padStart(2, '0');
         const year = today.getFullYear().toString().slice(-2);
-
         return `SQ-${day}-${month}-${year}-${newSequence}`;
       }
     }
 
-    // If new day or no previous order, start from 0001
     const day = today.getDate().toString().padStart(2, '0');
     const month = (today.getMonth() + 1).toString().padStart(2, '0');
     const year = today.getFullYear().toString().slice(-2);
-
     return `SQ-${day}-${month}-${year}-0001`;
   };
 
-  // Function to save last order number to localStorage
   const saveOrderNumber = orderNum => {
     const today = new Date().toISOString().split('T')[0];
     localStorage.setItem(
@@ -133,18 +148,22 @@ const Order = ({ onBack }) => {
     setOrderNumber(newOrderNumber);
   }, [date]);
 
-  useEffect(() => {
-    const handleResize = () => setWindowWidth(window.innerWidth);
-    window.addEventListener('resize', handleResize);
-
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  // useEffect(() => {
+  //   const handleResize = () => setWindowWidth(window.innerWidth);
+  //   window.addEventListener('resize', handleResize);
+  //   return () => window.removeEventListener('resize', handleResize);
+  // }, []);
 
   useEffect(() => {
     const fetchStockItems = async () => {
       try {
         const response = await api.get('/stock_item');
-        setItemOptions(response.data);
+        const formattedItems = response.data.map(item => ({
+          ...item,
+          label: `${item.item_code} - ${item.stock_item_name}`,
+          value: item.item_code,
+        }));
+        setItemOptions(formattedItems);
       } catch (error) {
         console.error('Error fetching stock items:', error);
       }
@@ -164,162 +183,637 @@ const Order = ({ onBack }) => {
     fetchCustomers();
   }, []);
 
-  const handleItemSelect = selected => {
-    setItem(selected);
-    deliveryDateRef.current.focus();
-  };
+  const handleItemSelect = (selected, index) => {
+    if (index === undefined) {
+      // For editing row
+      setEditingRow(prev => {
+        const updated = {
+          ...prev,
+          item: selected,
+          rate: selected?.rate || '',
+          hsn: selected?.hsn_code || selected?.hsn || '',
+          gst: selected?.gst || '18',
+          sgst: '', // Will calculate based on state
+          cgst: '', // Will calculate based on state
+          igst: selected?.igst || '',
+        };
 
-  const isValidDate = value => {
-    // Must match yyyy-mm-dd (HTML date input standard)
-    return /^\d{4}-\d{2}-\d{2}$/.test(value);
-  };
+        if (prev.quantity && selected?.rate) {
+          const amount = (Number(prev.quantity) || 0) * (Number(selected.rate) || 0);
+          updated.amount = amount;
 
-  // Add this function for field navigation
-  const handleFieldKeyDown = (e, nextFieldRef, currentValue, validator) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
+          // Get customer state
+          const customerState = isDistributorRoute
+            ? distributorUser?.state || ''
+            : selectedCustomer?.state || '';
 
-      if (validator && !validator(currentValue)) {
-        console.log('Date is not complete. Staying in same field.');
-        return;
+          // Calculate GST based on state
+          const gstPercentage = Number(selected?.gst || 18);
+          const gstAmount = amount * (gstPercentage / 100);
+
+          // If state is "Tamil Nadu", split GST into SGST and CGST
+          if (
+            customerState.toLowerCase() === 'tamil nadu' ||
+            customerState.toLowerCase() === 'tn'
+          ) {
+            const halfGST = gstAmount / 2;
+            updated.sgst = halfGST.toFixed(2);
+            updated.cgst = halfGST.toFixed(2);
+            updated.igst = ''; // Clear IGST for same state
+          } else {
+            // For other states, use IGST
+            updated.sgst = ''; // Clear SGST for inter-state
+            updated.cgst = ''; // Clear CGST for inter-state
+            updated.igst = gstAmount.toFixed(2);
+          }
+        }
+
+        return updated;
+      });
+
+      // After selecting item, focus on quantity field
+      setTimeout(() => {
+        editingRowInputRefs.current.quantity?.focus();
+      }, 100);
+    } else {
+      // For existing rows
+      const updatedRows = [...orderData];
+      updatedRows[index].item = selected;
+      updatedRows[index].itemCode = selected?.item_code || '';
+      updatedRows[index].itemName = selected?.stock_item_name || '';
+      updatedRows[index].rate = selected?.rate || '';
+      updatedRows[index].hsn = selected?.hsn_code || selected?.hsn || '';
+      updatedRows[index].gst = selected?.gst || '18';
+      updatedRows[index].sgst = '';
+      updatedRows[index].cgst = '';
+      updatedRows[index].igst = selected?.igst || '';
+      updatedRows[index].uom = selected?.uom || "No's";
+
+      if (updatedRows[index].itemQty && selected?.rate) {
+        const amount = (Number(updatedRows[index].itemQty) || 0) * (Number(selected.rate) || 0);
+        updatedRows[index].amount = amount;
+
+        // Get customer state
+        const customerState = isDistributorRoute
+          ? distributorUser?.state || ''
+          : selectedCustomer?.state || '';
+
+        // Calculate GST based on state
+        const gstPercentage = Number(selected?.gst || 18);
+        const gstAmount = amount * (gstPercentage / 100);
+
+        // If state is "Tamil Nadu", split GST into SGST and CGST
+        if (customerState.toLowerCase() === 'tamil nadu' || customerState.toLowerCase() === 'tn') {
+          const halfGST = gstAmount / 2;
+          updatedRows[index].sgst = halfGST.toFixed(2);
+          updatedRows[index].cgst = halfGST.toFixed(2);
+          updatedRows[index].igst = ''; // Clear IGST for same state
+        } else {
+          // For other states, use IGST
+          updatedRows[index].sgst = ''; // Clear SGST for inter-state
+          updatedRows[index].cgst = ''; // Clear CGST for inter-state
+          updatedRows[index].igst = gstAmount.toFixed(2);
+        }
       }
 
-      if (nextFieldRef && nextFieldRef.current) {
-        nextFieldRef.current.focus();
-      }
+      setOrderData(updatedRows);
+
+      // After selecting item, focus on quantity field
+      setTimeout(() => {
+        const quantityIndex = index * totalCols + 3;
+        inputRefs.current[quantityIndex]?.focus();
+      }, 100);
     }
   };
 
   const handleCustomerSelect = selected => {
     setCustomerName(selected);
-    // optionally focus next field
-    itemSelectRef.current.focus();
+    setSelectedCustomer(selected);
+
+    // If we have a distributor user, we should get their state too
+    if (isDistributorRoute && distributorUser) {
+      // Assuming distributorUser has state information
+      setSelectedCustomer({
+        ...selected,
+        state: distributorUser.state || '',
+      });
+    }
   };
 
-  const handleClick = () => {
-    if (!item || !quantity) return;
+  const handleAddRow = () => {
+    if (!editingRow.item || !editingRow.quantity) {
+      toast.error('Please select item and enter quantity!', {
+        position: 'bottom-right',
+        autoClose: 3000,
+      });
+      return;
+    }
 
     const newRow = {
-      itemCode: item.item_code,
-      itemName: item.stock_item_name,
-      hsn: item.hsn_code || item.hsn,
-      gst: item.gst,
-      delivery_date: deliveryDate,
-      delivery_mode: deliveryMode,
-      itemQty: Number(quantity),
-      uom: item.uom || "No's",
-      rate: Number(item.rate),
-      amount: Number(item.rate) * Number(quantity),
-      netRate: Number(item.rate),
-      grossAmount: Number(item.rate) * Number(quantity),
+      item: editingRow.item,
+      itemCode: editingRow.item.item_code,
+      itemName: editingRow.item.stock_item_name,
+      hsn: editingRow.hsn,
+      gst: editingRow.gst,
+      sgst: editingRow.sgst,
+      cgst: editingRow.cgst,
+      igst: editingRow.igst,
+      delivery_date: editingRow.delivery_date,
+      delivery_mode: editingRow.delivery_mode,
+      itemQty: Number(editingRow.quantity),
+      uom: editingRow.item.uom || "No's",
+      rate: Number(editingRow.rate),
+      amount: Number(editingRow.rate) * Number(editingRow.quantity),
+      netRate: Number(editingRow.rate),
+      grossAmount: Number(editingRow.rate) * Number(editingRow.quantity),
     };
+
     setOrderData(prev => [...prev, newRow]);
-    toast.info('Item added successfully!', {
-      position: 'bottom-right',
-      autoClose: 3000,
-      style: {
-        width: '380px',
-        minHeight: '20px',
-        fontSize: '12px',
-        padding: '10px',
-        borderRadius: '8px',
-        backgroundColor: '#f0f9ff',
-        color: '#0369a1',
-      },
-      progressStyle: {
-        background: 'linear-gradient(to right, #0369a1, #7dd3fc)',
-      },
+
+    // Reset editing row but keep customer state logic in mind
+    setEditingRow({
+      item: null,
+      delivery_date: '',
+      delivery_mode: '',
+      quantity: '',
+      rate: '',
+      amount: '',
+      hsn: '',
+      gst: '',
+      sgst: '',
+      cgst: '',
+      igst: '',
     });
 
-    setItem('');
-    setDeliveryDate('');
-    setDeliveryMode('');
-    setQuantity('');
-    setTransporterName('');
-    itemSelectRef.current.focus();
+    // Focus on the new editing row's select
+    setTimeout(() => {
+      editingRowSelectRef.current?.focus();
+    }, 100);
   };
 
-  // Function to handle quantity change in table rows
-  const handleQuantityChange = (index, newQuantity) => {
-    // Allow empty string
-    if (newQuantity === '') {
-      const updatedRows = [...orderData];
-      const row = updatedRows[index];
+  const handleFieldChange = (field, value, index) => {
+    if (index === undefined) {
+      // For editing row
+      setEditingRow(prev => {
+        const updated = { ...prev, [field]: value };
 
-      row.itemQty = 0;
-      row.amount = 0;
-      row.grossAmount = 0;
+        if (field === 'quantity' || field === 'rate' || field === 'gst') {
+          const qty = field === 'quantity' ? value : prev.quantity;
+          const rate = field === 'rate' ? value : prev.rate;
+          const gstPercentage = field === 'gst' ? value : prev.gst;
+
+          const amount = (Number(qty) || 0) * (Number(rate) || 0);
+          updated.amount = amount;
+
+          // Get customer state
+          const customerState = isDistributorRoute
+            ? distributorUser?.state || ''
+            : selectedCustomer?.state || '';
+
+          // Calculate GST based on state
+          const gstAmount = amount * (Number(gstPercentage || 18) / 100);
+
+          // If state is "Tamil Nadu", split GST into SGST and CGST
+          if (
+            customerState.toLowerCase() === 'tamil nadu' ||
+            customerState.toLowerCase() === 'tn'
+          ) {
+            const halfGST = gstAmount / 2;
+            updated.sgst = halfGST.toFixed(2);
+            updated.cgst = halfGST.toFixed(2);
+            updated.igst = ''; // Clear IGST for same state
+          } else {
+            // For other states, use IGST
+            updated.sgst = '';
+            updated.cgst = '';
+            updated.igst = gstAmount.toFixed(2);
+          }
+        }
+
+        return updated;
+      });
+    } else {
+      // For existing rows
+      const updatedRows = [...orderData];
+      updatedRows[index][field] = value;
+
+      if (field === 'itemQty' || field === 'rate' || field === 'gst') {
+        const qty = field === 'itemQty' ? value : updatedRows[index].itemQty;
+        const rate = field === 'rate' ? value : updatedRows[index].rate;
+        const gstPercentage = field === 'gst' ? value : updatedRows[index].gst;
+
+        const amount = (Number(qty) || 0) * (Number(rate) || 0);
+        updatedRows[index].amount = amount;
+
+        // Get customer state
+        const customerState = isDistributorRoute
+          ? distributorUser?.state || ''
+          : selectedCustomer?.state || '';
+
+        // Calculate GST based on state
+        const gstAmount = amount * (Number(gstPercentage || 18) / 100);
+
+        // If state is "Tamil Nadu", split GST into SGST and CGST
+        if (customerState.toLowerCase() === 'tamil nadu' || customerState.toLowerCase() === 'tn') {
+          const halfGST = gstAmount / 2;
+          updatedRows[index].sgst = halfGST.toFixed(2);
+          updatedRows[index].cgst = halfGST.toFixed(2);
+          updatedRows[index].igst = ''; // Clear IGST for same state
+        } else {
+          // For other states, use IGST
+          updatedRows[index].sgst = '';
+          updatedRows[index].cgst = '';
+          updatedRows[index].igst = gstAmount.toFixed(2);
+        }
+      }
 
       setOrderData(updatedRows);
-      return;
     }
-
-    // Only allow numbers and positive values
-    if (isNaN(newQuantity) || Number(newQuantity) < 0) {
-      return;
-    }
-
-    const updatedRows = [...orderData];
-    const row = updatedRows[index];
-
-    row.itemQty = Number(newQuantity);
-    row.amount = row.itemQty * row.rate;
-    row.grossAmount = row.itemQty * row.rate;
-
-    setOrderData(updatedRows);
   };
 
-  // Function to remove item from order
   const handleRemoveItem = index => {
     const updatedRows = orderData.filter((_, i) => i !== index);
     setOrderData(updatedRows);
+
+    // Clean up refs for the removed row
+    const startIndex = index * totalCols;
+    const endIndex = startIndex + totalCols;
+
+    inputRefs.current = inputRefs.current.filter((_, i) => i < startIndex || i >= endIndex);
+    selectRefs.current = selectRefs.current.filter((_, i) => i < startIndex || i >= endIndex);
+
+    // Re-index remaining refs
+    const newInputRefs = [];
+    const newSelectRefs = [];
+
+    updatedRows.forEach((_, newIndex) => {
+      for (let col = 0; col < totalCols; col++) {
+        const oldIndex = (newIndex >= index ? newIndex + 1 : newIndex) * totalCols + col;
+        if (col === 1) {
+          newSelectRefs[newIndex * totalCols + col] = selectRefs.current[oldIndex];
+        } else {
+          newInputRefs[newIndex * totalCols + col] = inputRefs.current[oldIndex];
+        }
+      }
+    });
+
+    inputRefs.current = newInputRefs;
+    selectRefs.current = newSelectRefs;
+
     toast.info('Item removed from order!', {
       position: 'bottom-right',
       autoClose: 3000,
     });
   };
 
-  const handleDeliveryDateChange = selectedDate => {
-    setDeliveryDate(selectedDate);
-  };
+  // Enhanced keyboard navigation handler
+  const handleKeyDownTable = (e, rowIndex, colIndex, fieldType = 'input') => {
+    const key = e.key;
 
-  // Add onBlur handler for validation
-  const handleDeliveryDateBlur = e => {
-    const selectedDate = e.target.value;
+    // Calculate total rows including editing row
+    const totalRows = orderData.length + 1; // +1 for editing row
+    // const isEditingRow = rowIndex === totalRows - 1;
 
-    if (selectedDate && selectedDate < date) {
-      toast.error('Please enter valid delivery date!', {
-        position: 'bottom-right',
-        autoClose: 4000,
-      });
-      setDeliveryDate(''); // Clear the invalid date
-      // Keep focus on delivery date field instead of moving to next field
+    if (key === 'Enter' || key === 'Tab') {
+      e.preventDefault();
+
+      let nextRow = rowIndex;
+      let nextCol = colIndex + 1;
+
+      // If at last column (delivery_mode), move to action column (Add button)
+      if (colIndex === 13) {
+        // Delivery Mode column
+        nextCol = actionColumnIndex;
+      }
+      // If at last column (action), move to next row first column
+      else if (colIndex >= actionColumnIndex) {
+        nextRow += 1;
+        nextCol = 1; // Skip S.No column
+      }
+      // If at last column before action, move to action
+      else if (nextCol >= totalCols) {
+        nextRow += 1;
+        nextCol = 1;
+      }
+
+      // If at last row and last column, stay at current
+      if (nextRow >= totalRows) {
+        return;
+      }
+
+      // Focus on next element
       setTimeout(() => {
-        deliveryDateRef.current.focus();
-      }, 100);
-      return false; // Prevent further processing
+        if (nextRow === totalRows - 1) {
+          // Moving to editing row
+          if (nextCol === 1) {
+            // Product Code (Select)
+            editingRowSelectRef.current?.focus();
+          } else if (nextCol === actionColumnIndex) {
+            // Add button in editing row
+            addButtonRef.current?.focus();
+          } else {
+            // Other fields in editing row
+            const fieldMap = {
+              2: 'itemName',
+              3: 'quantity',
+              4: 'uom',
+              5: 'rate',
+              6: 'amount',
+              7: 'hsn',
+              8: 'gst',
+              9: 'sgst',
+              10: 'cgst',
+              11: 'igst',
+              12: 'delivery_date',
+              13: 'delivery_mode',
+            };
+            const field = fieldMap[nextCol];
+            if (field && editingRowInputRefs.current[field]) {
+              editingRowInputRefs.current[field].focus();
+            }
+          }
+        } else {
+          // Moving within existing rows
+          if (nextCol === 1) {
+            // Product Code (Select)
+            selectRefs.current[nextRow * totalCols + nextCol]?.focus();
+          } else if (nextCol === actionColumnIndex) {
+            // Delete button - skip it and move to next
+            handleKeyDownTable({ key: 'Enter' }, nextRow, nextCol);
+          } else {
+            // Other fields
+            inputRefs.current[nextRow * totalCols + nextCol]?.focus();
+          }
+        }
+      }, 0);
+    } else if (key === 'ArrowRight') {
+      e.preventDefault();
+      handleKeyDownTable({ key: 'Enter' }, rowIndex, colIndex, fieldType);
+    } else if (key === 'ArrowLeft') {
+      e.preventDefault();
+      let prevRow = rowIndex;
+      let prevCol = colIndex - 1;
+
+      if (prevCol < 1) {
+        // Skip S.No column
+        prevRow -= 1;
+        prevCol = actionColumnIndex; // Go to action column of previous row
+      }
+
+      if (prevRow >= 0) {
+        setTimeout(() => {
+          if (prevRow === totalRows - 1) {
+            // Moving within editing row backward
+            if (prevCol === 1) {
+              editingRowSelectRef.current?.focus();
+            } else if (prevCol === actionColumnIndex) {
+              addButtonRef.current?.focus();
+            } else {
+              const fieldMap = {
+                2: 'itemName',
+                3: 'quantity',
+                4: 'uom',
+                5: 'rate',
+                6: 'amount',
+                7: 'hsn',
+                8: 'gst',
+                9: 'sgst',
+                10: 'cgst',
+                11: 'igst',
+                12: 'delivery_date',
+                13: 'delivery_mode',
+              };
+              const field = fieldMap[prevCol];
+              if (field && editingRowInputRefs.current[field]) {
+                editingRowInputRefs.current[field].focus();
+              }
+            }
+          } else {
+            // Moving within existing rows backward
+            if (prevCol === 1) {
+              selectRefs.current[prevRow * totalCols + prevCol]?.focus();
+            } else if (prevCol === actionColumnIndex) {
+              // Skip delete button, move to previous column
+              handleKeyDownTable({ key: 'ArrowLeft' }, prevRow, prevCol);
+            } else {
+              inputRefs.current[prevRow * totalCols + prevCol]?.focus();
+            }
+          }
+        }, 0);
+      }
+    } else if (key === 'ArrowDown') {
+      e.preventDefault();
+      let nextRow = rowIndex + 1;
+      if (nextRow < totalRows) {
+        setTimeout(() => {
+          if (nextRow === totalRows - 1) {
+            // Moving down to editing row
+            if (colIndex === 1) {
+              editingRowSelectRef.current?.focus();
+            } else if (colIndex === actionColumnIndex) {
+              addButtonRef.current?.focus();
+            } else {
+              const fieldMap = {
+                2: 'itemName',
+                3: 'quantity',
+                4: 'uom',
+                5: 'rate',
+                6: 'amount',
+                7: 'hsn',
+                8: 'gst',
+                9: 'sgst',
+                10: 'cgst',
+                11: 'igst',
+                12: 'delivery_date',
+                13: 'delivery_mode',
+              };
+              const field = fieldMap[colIndex];
+              if (field && editingRowInputRefs.current[field]) {
+                editingRowInputRefs.current[field].focus();
+              }
+            }
+          } else {
+            // Moving down within existing rows
+            if (colIndex === 1) {
+              selectRefs.current[nextRow * totalCols + colIndex]?.focus();
+            } else if (colIndex === actionColumnIndex) {
+              // Skip delete button, move to same column in next row
+              handleKeyDownTable({ key: 'ArrowDown' }, rowIndex, colIndex);
+            } else {
+              inputRefs.current[nextRow * totalCols + colIndex]?.focus();
+            }
+          }
+        }, 0);
+      }
+    } else if (key === 'ArrowUp') {
+      e.preventDefault();
+      let prevRow = rowIndex - 1;
+      if (prevRow >= 0) {
+        setTimeout(() => {
+          if (prevRow === totalRows - 1) {
+            // Moving up to editing row from below (shouldn't happen as editing is last)
+            // But handle it anyway
+            if (colIndex === 1) {
+              editingRowSelectRef.current?.focus();
+            } else if (colIndex === actionColumnIndex) {
+              addButtonRef.current?.focus();
+            } else {
+              const fieldMap = {
+                2: 'itemName',
+                3: 'quantity',
+                4: 'uom',
+                5: 'rate',
+                6: 'amount',
+                7: 'hsn',
+                8: 'gst',
+                9: 'sgst',
+                10: 'cgst',
+                11: 'igst',
+                12: 'delivery_date',
+                13: 'delivery_mode',
+              };
+              const field = fieldMap[colIndex];
+              if (field && editingRowInputRefs.current[field]) {
+                editingRowInputRefs.current[field].focus();
+              }
+            }
+          } else {
+            // Moving up within existing rows
+            if (colIndex === 1) {
+              selectRefs.current[prevRow * totalCols + colIndex]?.focus();
+            } else if (colIndex === actionColumnIndex) {
+              // Skip delete button, move to same column in previous row
+              handleKeyDownTable({ key: 'ArrowUp' }, rowIndex, colIndex);
+            } else {
+              inputRefs.current[prevRow * totalCols + colIndex]?.focus();
+            }
+          }
+        }, 0);
+      }
+    } else if (key === 'Escape') {
+      if (onBack) {
+        onBack();
+      } else {
+        navigate(-1);
+      }
     }
-    return true; // validation passed
   };
+
+  // Handler specifically for editing row
+  const handleEditingRowKeyDown = (e, colIndex, fieldType = 'input') => {
+    const rowIndex = orderData.length; // Editing row is always last
+    handleKeyDownTable(e, rowIndex, colIndex, fieldType);
+  };
+
+  // Handle Add button key events
+  const handleAddButtonKeyDown = e => {
+    const key = e.key;
+
+    if (key === 'Enter') {
+      e.preventDefault();
+      handleAddRow();
+    } else if (key === 'Tab' || key === 'ArrowRight') {
+      e.preventDefault();
+      // Move to next focusable element (Remarks textarea)
+      const remarksTextarea = document.querySelector('textarea[name="remarks"]');
+      if (remarksTextarea) {
+        remarksTextarea.focus();
+      }
+    } else if (key === 'ArrowLeft') {
+      e.preventDefault();
+      // Move to previous column in editing row (Delivery Mode)
+      setTimeout(() => {
+        editingRowInputRefs.current.delivery_mode?.focus();
+      }, 0);
+    } else if (key === 'ArrowUp') {
+      e.preventDefault();
+      // Move to same column in previous row (Action column of previous row)
+      const prevRowIndex = orderData.length - 1;
+      if (prevRowIndex >= 0) {
+        // Since delete button is not focusable, move to Delivery Mode in previous row
+        setTimeout(() => {
+          inputRefs.current[prevRowIndex * totalCols + 13]?.focus();
+        }, 0);
+      }
+    } else if (key === 'ArrowDown') {
+      e.preventDefault();
+      // Move to next focusable element after table (Remarks textarea)
+      const remarksTextarea = document.querySelector('textarea[name="remarks"]');
+      if (remarksTextarea) {
+        remarksTextarea.focus();
+      }
+    }
+  };
+
+  // Handle remarks textarea key events
+  const handleRemarksKeyDown = e => {
+    const key = e.key;
+
+    if (key === 'ArrowUp') {
+      e.preventDefault();
+      // Move back to Add button
+      addButtonRef.current?.focus();
+    } else if (key === 'ArrowLeft' || key === 'ArrowRight' || key === 'ArrowDown') {
+      // Allow normal text navigation
+    } else if (key === 'Tab' && !e.shiftKey) {
+      e.preventDefault();
+      // Move to Status select
+      const statusSelect = document.querySelector('select[disabled]');
+      if (statusSelect) {
+        statusSelect.focus();
+      }
+    } else if (key === 'Tab' && e.shiftKey) {
+      e.preventDefault();
+      // Move back to Add button
+      addButtonRef.current?.focus();
+    }
+  };
+
+  // Focus first field when editing row is empty
+  useEffect(() => {
+    if (orderData.length === 0 && !editingRow.item) {
+      setTimeout(() => {
+        editingRowSelectRef.current?.focus();
+      }, 100);
+    }
+  }, [orderData.length, editingRow.item]);
 
   const postOrder = async () => {
-    if (isSubmitttingRef.current) return; // Prevent multiple submissions
-
+    if (isSubmitttingRef.current) return;
     isSubmitttingRef.current = true;
 
     try {
       const result = await api.post('/orders', database);
       console.log(result);
 
-      // Generate next order number after successful submission
       const nextOrderNumber = generateOrderNumber();
       saveOrderNumber(nextOrderNumber);
       setOrderNumber(nextOrderNumber);
 
-      // clear order data and database after successful submission
       setOrderData([]);
       setDatebase([]);
       setRemarks('');
+
+      setEditingRow({
+        item: null,
+        delivery_date: '',
+        delivery_mode: '',
+        quantity: '',
+        rate: '',
+        amount: '',
+        hsn: '',
+        gst: '',
+        sgst: '',
+        cgst: '',
+        igst: '',
+      });
+
+      if (!isDistributorRoute) {
+        setCustomerName(null);
+        if (customerSelectRef.current) {
+          customerSelectRef.current.clearValue();
+        }
+      }
 
       toast.success('Order Placed Successfully and waiting for approval!.', {
         position: 'bottom-right',
@@ -331,7 +825,29 @@ const Order = ({ onBack }) => {
         position: 'bottom-right',
         autoClose: 3000,
       });
+    } finally {
+      isSubmitttingRef.current = false;
     }
+  };
+
+  const convertToMySQLDate = dateString => {
+    if (!dateString) return '';
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+      return dateString;
+    }
+
+    const parts = dateString.split('-');
+    if (parts.length === 3) {
+      if (parts[0].length === 2 && parts[1].length === 2 && parts[2].length === 4) {
+        return `${parts[2]}-${parts[1]}-${parts[0]}`;
+      }
+      if (parts[0].length === 2 && parts[1].length === 2 && parts[2].length === 4) {
+        return `${parts[2]}-${parts[0]}-${parts[1]}`;
+      }
+    }
+
+    return '';
   };
 
   const handleSubmit = e => {
@@ -342,12 +858,12 @@ const Order = ({ onBack }) => {
         position: 'bottom-right',
         autoClose: 3000,
       });
-      customerSelectRef.current.focus();
       return;
     }
 
-    if (orderData.length >= 1) {
-      // determine voucher type based on location path
+    const hasEditingRowData = editingRow.item && editingRow.quantity;
+
+    if (orderData.length >= 1 || hasEditingRowData) {
       const getVoucherType = () => {
         if (location.pathname.includes('/corporate')) {
           return 'Direct Order Management';
@@ -359,7 +875,6 @@ const Order = ({ onBack }) => {
       };
 
       const voucherType = getVoucherType();
-      // ✅ Handle customer data based on route
       const customerData = isDistributorRoute
         ? {
             customer_code: distributorUser?.customer_code || 'DISTRIBUTOR',
@@ -370,10 +885,34 @@ const Order = ({ onBack }) => {
             customer_name: customerName?.customer_name || '',
           };
 
-      const dbd = orderData.map(item => ({
+      const allRows = [...orderData];
+
+      if (hasEditingRowData) {
+        const editingRowData = {
+          item: editingRow.item,
+          itemCode: editingRow.item.item_code,
+          itemName: editingRow.item.stock_item_name,
+          hsn: editingRow.hsn,
+          gst: editingRow.gst,
+          sgst: editingRow.sgst,
+          cgst: editingRow.cgst,
+          igst: editingRow.igst,
+          delivery_date: editingRow.delivery_date,
+          delivery_mode: editingRow.delivery_mode,
+          itemQty: Number(editingRow.quantity),
+          uom: editingRow.item.uom || "No's",
+          rate: Number(editingRow.rate),
+          amount: Number(editingRow.rate) * Number(editingRow.quantity),
+          netRate: Number(editingRow.rate),
+          grossAmount: Number(editingRow.rate) * Number(editingRow.quantity),
+        };
+        allRows.push(editingRowData);
+      }
+
+      const dbd = allRows.map(item => ({
         voucher_type: voucherType,
         order_no: orderNumber,
-        date,
+        date: date,
         status: 'pending',
         executiveCode: distributorUser.customer_code || '',
         executive: distributorUser.customer_name || '',
@@ -382,9 +921,12 @@ const Order = ({ onBack }) => {
         customer_name: customerData.customer_name,
         item_code: item.itemCode,
         item_name: item.itemName,
-        hsn: item.hsn_code || item.hsn,
+        hsn: item.hsn,
         gst: Number(String(item.gst).replace('%', '').trim()),
-        delivery_date: item.delivery_date,
+        sgst: Number(String(item.sgst).replace('%', '').trim()),
+        cgst: Number(String(item.cgst).replace('%', '').trim()),
+        igst: Number(String(item.igst).replace('%', '').trim()),
+        delivery_date: convertToMySQLDate(item.delivery_date),
         delivery_mode: item.delivery_mode,
         quantity: item.itemQty,
         uom: item.uom,
@@ -396,21 +938,21 @@ const Order = ({ onBack }) => {
         disc_amount: 0,
         spl_disc_percentage: 0,
         spl_disc_amount: 0,
-        total_quantity: totals.qty,
-        total_amount: totals.amount,
+        total_quantity: totals.qty + (hasEditingRowData ? Number(editingRow.quantity) : 0),
+        total_amount:
+          totals.amount +
+          (hasEditingRowData ? Number(editingRow.rate) * Number(editingRow.quantity) : 0),
         remarks: remarks,
       }));
 
       setDatebase(prev => [...prev, ...dbd]);
       console.log('Submitting order data:', dbd);
 
-      // generate and update the next order number
       const nextOrderNumber = generateOrderNumber();
       saveOrderNumber(nextOrderNumber);
       setOrderNumber(nextOrderNumber);
 
-      // Reset form fields after successful submission
-      resetFormFields();
+      resetForm();
     } else {
       toast.error('No items in the order. Please add items before submitting.', {
         position: 'bottom-right',
@@ -419,25 +961,49 @@ const Order = ({ onBack }) => {
     }
   };
 
-  const resetFormFields = () => {
-    setCustomerName(null);
-    setItem(null);
-    setDeliveryDate('');
-    setDeliveryMode('');
-    setTransporterName('');
-    setQuantity('');
-    setRemarks('');
+  const resetForm = () => {
+    setOrderData([]);
+    setEditingRow({
+      item: null,
+      delivery_date: '',
+      delivery_mode: '',
+      quantity: '',
+      rate: '',
+      amount: '',
+      hsn: '',
+      gst: '',
+      sgst: '',
+      cgst: '',
+      igst: '',
+    });
 
-    // Reset select components
-    if (customerSelectRef.current) {
-      customerSelectRef.current.clearValue();
+    if (!isDistributorRoute) {
+      setCustomerName(null);
+      if (customerSelectRef.current) {
+        customerSelectRef.current.clearValue();
+      }
     }
-    if (itemSelectRef.current) {
-      itemSelectRef.current.clearValue();
-    }
-    // focus on customer select for next entry
+
+    setRemarks('');
+    setTotals({
+      qty: 0,
+      amount: 0,
+      netAmt: 0,
+      grossAmt: 0,
+      sgstAmt: 0,
+      cgstAmt: 0,
+      igstAmt: 0,
+      totalAmount: 0,
+    });
+
+    // Reset refs
+    inputRefs.current = [];
+    selectRefs.current = [];
+    editingRowInputRefs.current = {};
+
+    // Focus on editing row select
     setTimeout(() => {
-      customerSelectRef.current.focus();
+      editingRowSelectRef.current?.focus();
     }, 100);
   };
 
@@ -450,16 +1016,48 @@ const Order = ({ onBack }) => {
   useEffect(() => {
     const totalQty = orderData.reduce((sum, row) => sum + Number(row.itemQty || 0), 0);
     const totalAmt = orderData.reduce((sum, row) => sum + Number(row.amount || 0), 0);
-    const totalNetRate = orderData.reduce((sum, row) => sum + Number(row.netRate || 0), 0);
-    const totalGrossAmt = orderData.reduce((sum, row) => sum + Number(row.grossAmount || 0), 0);
+
+    // Calculate GST totals based on state
+    const totalSgstAmt = orderData.reduce((sum, row) => sum + Number(row.sgst || 0), 0);
+    const totalCgstAmt = orderData.reduce((sum, row) => sum + Number(row.cgst || 0), 0);
+    const totalIgstAmt = orderData.reduce((sum, row) => sum + Number(row.igst || 0), 0);
+
+    const editingRowQty = Number(editingRow.quantity || 0);
+    const editingRowAmount = Number(editingRow.amount || 0);
+    const editingRowSgst = Number(editingRow.sgst || 0);
+    const editingRowCgst = Number(editingRow.cgst || 0);
+    const editingRowIgst = Number(editingRow.igst || 0);
+
+    // Calculate total amount based on state
+    const customerState = isDistributorRoute
+      ? distributorUser?.state || ''
+      : selectedCustomer?.state || '';
+
+    let totalAmountValue;
+
+    if (customerState.toLowerCase() === 'tamil nadu' || customerState.toLowerCase() === 'tn') {
+      // For Tamil Nadu: Amount + SGST + CGST
+      totalAmountValue =
+        totalAmt +
+        editingRowAmount +
+        (totalSgstAmt + editingRowSgst) +
+        (totalCgstAmt + editingRowCgst);
+    } else {
+      // For other states: Amount + IGST
+      totalAmountValue = totalAmt + editingRowAmount + (totalIgstAmt + editingRowIgst);
+    }
 
     setTotals({
-      qty: totalQty,
-      amount: totalAmt,
-      netAmt: totalNetRate,
-      grossAmt: totalGrossAmt,
+      qty: totalQty + editingRowQty,
+      amount: totalAmt + editingRowAmount,
+      sgstAmt: totalSgstAmt + editingRowSgst,
+      cgstAmt: totalCgstAmt + editingRowCgst,
+      igstAmt: totalIgstAmt + editingRowIgst,
+      netAmt: 0, // Add calculation if needed
+      grossAmt: 0, // Add calculation if needed
+      totalAmount: totalAmountValue,
     });
-  }, [orderData]);
+  }, [orderData, editingRow, selectedCustomer, isDistributorRoute, distributorUser]);
 
   const formatCurrency = value => {
     return new Intl.NumberFormat('en-IN', {
@@ -471,62 +1069,47 @@ const Order = ({ onBack }) => {
       .replace(/^₹/, '₹ ');
   };
 
-  const customStyles = {
-    control: base => {
-      let customWidth = '500px';
-      if (windowWidth <= 768) {
-        customWidth = '100%';
-      } else if (windowWidth <= 1024) {
-        customWidth = '200px';
-      } else if (windowWidth <= 1280) {
-        customWidth = '250px';
-      } else if (windowWidth <= 1366) {
-        customWidth = '300px';
-      }
-      return {
-        ...base,
-        minHeight: '26px', // 🔽 Reduce height here
-        height: '26px',
-        padding: '0 1px',
-        width: customWidth,
-        backgroundColor: '#E9EFEC',
-        borderColor: '#932F67', // Tailwind: blue-400 / gray-300
-        boxShadow: 'none',
-      };
-    },
-    valueContainer: base => ({
+  // Custom styles for table selects
+  const tableSelectStyles = {
+    control: base => ({
       ...base,
-      padding: '0px 4px', // 🔽 Reduce internal padding
-      height: '20px',
+      minHeight: '24px',
+      height: '24px',
+      padding: '0 1px',
+      width: '100%',
+      backgroundColor: 'white',
+      border: '1px solid #d1d5db',
+      boxShadow: 'none',
+      '&:hover': {
+        borderColor: '#932F67',
+      },
     }),
-    menu: base => {
-      let customWidth = '550px';
-      if (windowWidth <= 768) {
-        customWidth = '100%';
-      } else if (windowWidth <= 1024) {
-        customWidth = '350px';
-      } else if (windowWidth <= 1366) {
-        customWidth = '400px';
-      }
-      return {
-        ...base,
-        width: customWidth, // Custom width
-        overflowY: 'auto', // Scroll if too many options
-        zIndex: 9999, // Ensure on top
-        border: '1px solid #ddd',
-      };
-    },
-    option: (base, state) => ({
+    menu: base => ({
       ...base,
-      padding: '8px 12px',
-      backgroundColor: state.isFocused ? '#f0f0f0' : 'white',
-      color: 'black',
-      cursor: 'pointer',
+      width: '405px',
+      height: '68vh',
+      fontSize: '12px',
+      zIndex: 9999,
+      position: 'absolute',
     }),
     menuList: base => ({
       ...base,
+      maxHeight: '68vh',
       padding: 0,
-      minHeight: '55vh',
+    }),
+    menuPortal: base => ({
+      ...base,
+      zIndex: 9999,
+    }),
+    option: base => ({
+      ...base,
+      padding: '6px 12px',
+      fontSize: '12px',
+    }),
+    valueContainer: base => ({
+      ...base,
+      padding: '0px 4px',
+      height: '20px',
     }),
     input: base => ({
       ...base,
@@ -536,9 +1119,9 @@ const Order = ({ onBack }) => {
   };
 
   return (
-    <div className="p-3 bg-[#E9EFEC] border-2 h-screen font-amasis">
-      <div className="px-1 py-2 grid  grid-cols-[auto_1fr_1fr_0.8fr_2fr_1.2fr_1.2fr] gap-2 items-center border transition-all">
-        {/* Back Arrow */}
+    <div className="p-3 bg-amber-50 border-2 h-screen font-amasis">
+      {/* Header section remains same */}
+      <div className="px-1 py-2 grid grid-cols-[auto_1fr_1fr_0.8fr_2fr_1.2fr_1.2fr] gap-2 items-center border transition-all">
         <button
           onClick={onBack}
           className="p-1 rounded hover:bg-gray-200 transition justify-self-start"
@@ -558,13 +1141,9 @@ const Order = ({ onBack }) => {
                 ? 'Distributor Order-Web Based'
                 : 'Select Order'
             }
-            className="outline-none border rounded-[5px] focus: border-[#932F67]  p-[3.5px] text-sm bg-transparent font-medium w-52"
+            className="outline-none border rounded-[5px] focus:border-[#932F67] p-[3.5px] text-sm bg-transparent font-medium w-52"
           />
-          <span
-            className="absolute left-2.5 top-[12px]  transition-all pointer-events-none -translate-y-[17px] text-[#932F67]
-             px-1.5 font-semibold text-[12px] bg-[#E9EFEC] leading-2 rounded
-          "
-          >
+          <span className="absolute left-2.5 top-[12px] transition-all pointer-events-none -translate-y-[17px] text-[#932F67] px-1.5 font-semibold text-[12px] bg-[#E9EFEC] leading-2 rounded">
             Voucher Type *
           </span>
         </div>
@@ -575,18 +1154,13 @@ const Order = ({ onBack }) => {
             required
             readOnly
             value={orderNumber}
-            className="outline-none border rounded-[5px] focus: border-[#932F67]  p-[3.5px] text-sm bg-transparent font-medium"
+            className="outline-none border rounded-[5px] focus:border-[#932F67] p-[3.5px] text-sm bg-transparent font-medium"
           />
-          <span
-            className="absolute left-2.5 top-[12px]  transition-all pointer-events-none -translate-y-[17px] text-[#932F67]
-             px-1.5 font-semibold text-[12px] bg-[#E9EFEC] leading-2 rounded
-          "
-          >
+          <span className="absolute left-2.5 top-[12px] transition-all pointer-events-none -translate-y-[17px] text-[#932F67] px-1.5 font-semibold text-[12px] bg-[#E9EFEC] leading-2 rounded">
             Order No *
           </span>
         </div>
 
-        {/* Customer Code Selection Field */}
         {!isDistributorRoute && (
           <div className="relative w-[116px]">
             <Select
@@ -594,21 +1168,16 @@ const Order = ({ onBack }) => {
               className="text-sm peer"
               value={customerName}
               options={customerOptions}
-              // getOptionLabel={e => e.label} // Use the custom label for dropdown
-              getOptionValue={e => e.customer_code} // Store only the code
+              getOptionValue={e => e.customer_code}
               onChange={handleCustomerSelect}
               placeholder=""
-              components={{
-                DropdownIndicator: () => null,
-                IndicatorSeparator: () => null,
-              }}
+              components={{ DropdownIndicator: () => null, IndicatorSeparator: () => null }}
               formatOptionLabel={(option, { context }) =>
                 context === 'menu'
                   ? `${option.customer_code} - ${option.customer_name}`
                   : option.customer_code
               }
               styles={{
-                ...customStyles,
                 control: base => ({
                   ...base,
                   minHeight: '30px',
@@ -623,7 +1192,6 @@ const Order = ({ onBack }) => {
                 singleValue: base => ({
                   ...base,
                   lineHeight: '1',
-                  // Ensure only code is displayed in the input
                   '& > div': {
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
@@ -664,7 +1232,6 @@ const Order = ({ onBack }) => {
           </div>
         )}
 
-        {/* Customer Name (Read-only) */}
         {!isDistributorRoute && (
           <div className="relative ml-7 w-80">
             <input
@@ -672,7 +1239,6 @@ const Order = ({ onBack }) => {
               readOnly
               value={customerName ? customerName.customer_name : ''}
               className="outline-none border rounded-[5px] border-[#932F67] p-[3.5px] text-sm bg-gray-100 font-medium w-full"
-              placeholder=""
             />
             <span className="absolute left-2.5 top-[12px] transition-all pointer-events-none -translate-y-[17px] text-[#932F67] px-1.5 font-semibold text-[12px] bg-[#E9EFEC] leading-2 rounded">
               Customer Name *
@@ -707,234 +1273,64 @@ const Order = ({ onBack }) => {
             required
             defaultValue={date}
             onChange={e => setDate(e.target.value)}
-            className="
-           peer w-full border border-[#932F67] rounded p-[3.5px] focus:outline-none focus:border-[#932F67] text-sm font-medium"
+            className="peer w-full border border-[#932F67] rounded p-[3.5px] focus:outline-none focus:border-[#932F67] text-sm font-medium"
           />
-
-          <span
-            className="absolute left-2.5 top-[12px]  transition-all pointer-events-none -translate-y-[17px] text-[#932F67]
-             px-1.5 font-semibold text-[12px] bg-[#E9EFEC] peer-valid:text-[#932F67] leading-2 rounded
-          "
-          >
+          <span className="absolute left-2.5 top-[12px] transition-all pointer-events-none -translate-y-[17px] text-[#932F67] px-1.5 font-semibold text-[12px] bg-[#E9EFEC] peer-valid:text-[#932F67] leading-2 rounded">
             Order Date *
           </span>
         </div>
       </div>
 
       {/* Body Part */}
-      <div className="mt-1 border h-[87vh]">
-        <div className="flex p-1 h-16 items-center gap-4">
-          {/* Item Code Selection */}
-          <div className="relative w-32">
-            <Select
-              ref={itemSelectRef}
-              className="text-sm peer"
-              value={item}
-              options={itemOptions}
-              // getOptionLabel={e => `${e.item_code} - ${e.stock_item_name}`}
-              getOptionValue={e => e.item_code}
-              onChange={handleItemSelect}
-              placeholder=""
-              components={{
-                DropdownIndicator: () => null,
-                IndicatorsContainer: () => null,
-              }}
-              formatOptionLabel={(option, { context }) =>
-                context === 'menu'
-                  ? `${option.item_code} - ${option.stock_item_name}`
-                  : option.item_code
-              }
-              styles={{
-                ...customStyles,
-                control: base => ({
-                  ...base,
-                  minHeight: '30px',
-                  height: '30px',
-                  backgroundColor: '#F8F4EC',
-                  borderColor: '#932F67',
-                  boxShadow: 'none',
-                  cursor: 'pointer',
-                }),
-                singleValue: base => ({
-                  ...base,
-                  lineHeight: '1',
-                }),
-                placeholder: base => ({
-                  ...base,
-                  textAlign: 'center',
-                  color: '#777',
-                  fontSize: '12px',
-                }),
-                option: (base, state) => ({
-                  ...base,
-                  fontFamily: 'font-amasis',
-                  fontWeight: '600',
-                  padding: '4px 24px',
-                  lineHeight: '1.2',
-                  backgroundColor: state.isFocused ? '#f0f0f0' : 'white',
-                  color: '#555',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                }),
-                menu: base => ({
-                  ...base,
-                  width: '550px',
-                  minWidth: '120px',
-                  zIndex: 9999,
-                }),
-              }}
-              menuPortalTarget={document.body}
-            />
-            <span className="absolute left-2.5 top-[10px] transition-all text-[12px] -translate-y-[15px] text-[#932F67] bg-[#E9EFEC] px-1 rounded font-semibold leading-2">
-              Item Code *
-            </span>
-          </div>
-
-          {/* Item Name (Read-only) */}
-          <div className="relative w-[450px]">
-            <input
-              type="text"
-              readOnly
-              value={item ? item.stock_item_name : ''}
-              className="outline-none border rounded-[5px] border-[#932F67] p-[3.5px] text-sm bg-gray-100 font-medium w-full"
-              placeholder=""
-            />
-            <span className="absolute left-2.5 top-[10px] transition-all text-[12px] -translate-y-[15px] text-[#932F67] bg-[#E9EFEC] px-1 rounded font-semibold leading-2">
-              Item Name *
-            </span>
-          </div>
-
-          <div className="relative">
-            <input
-              type="date"
-              ref={deliveryDateRef}
-              value={deliveryDate}
-              min={date} // This prevents selecting past dates in the calendar UI
-              onChange={e => handleDeliveryDateChange(e.target.value)}
-              onBlur={handleDeliveryDateBlur}
-              onKeyDown={e =>
-                handleFieldKeyDown(
-                  e,
-                  deliveryModeRef,
-                  deliveryDate,
-                  isValidDate, // pass validator
-                )
-              }
-              className="border p-[3.5px] rounded-[5px] border-[#932F67] text-sm font-medium w-full bg-white cursor-pointer"
-            />
-            <span
-              className="absolute left-2.5 top-[10px] transition-all text-[12px]
-     -translate-y-[15px] text-[#932F67] bg-[#E9EFEC] px-1.5 rounded font-semibold leading-2"
-            >
-              Delivery Date *
-            </span>
-          </div>
-
-          <div className="relative w-36">
-            <input
-              type="text"
-              value={deliveryMode}
-              ref={deliveryModeRef}
-              onChange={e => setDeliveryMode(e.target.value)}
-              onKeyDown={e => handleFieldKeyDown(e, transporterNameRef)}
-              className="border p-[3.5px] rounded-[5px] border-[#932F67] text-sm font-medium w-full outline-none focus:border-[#693382]"
-            />
-            <span
-              className="absolute left-2.5 top-[10px] transition-all text-[12px]
-               -translate-y-[15px] text-[#932F67] bg-[#E9EFEC] px-1.5 rounded font-semibold leading-2"
-            >
-              Delivery Mode *
-            </span>
-          </div>
-
-          <div className="relative w-40">
-            <input
-              type="text"
-              ref={transporterNameRef}
-              value={transporterName}
-              onChange={e => setTransporterName(e.target.value)}
-              onKeyDown={e => handleFieldKeyDown(e, quantityInputRef)}
-              placeholder=""
-              className="border p-[3.5px] rounded-[5px] border-[#932F67] text-sm font-medium w-full outline-none focus:border-[#693382]"
-            />
-            <span
-              className="absolute left-2.5 top-[10px] transition-all text-[12px]
-     -translate-y-[15px] text-[#932F67] bg-[#E9EFEC] px-1.5 rounded font-semibold leading-2"
-            >
-              Transporter Name *
-            </span>
-          </div>
-
-          <div className="flex items-center ml-5">
-            <span className="text-sm mr-2 font-medium">Qty * :</span>
-            <input
-              type="number"
-              name="qty"
-              ref={quantityInputRef}
-              value={quantity}
-              onChange={e => setQuantity(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleClick(); // Automatically add item on Enter
-                }
-              }}
-              placeholder="0"
-              min="0"
-              step="1"
-              className="py-1 border w-16 outline-none text-sm rounded px-1 border-[#932F67] bg-[#F8F4EC] text-center"
-              autoComplete="off"
-            />
-          </div>
-
-          <div className="flex justify-end ml-5.5">
-            <input
-              type="button"
-              ref={buttonRef}
-              value={'Add'}
-              onClick={handleClick}
-              className="bg-[#693382] text-white px-4 rounded-[6px] py-1 outline-none cursor-pointer"
-            />
-          </div>
-        </div>
-
+      <div className="mt-1 border h-[88.5vh]">
         {/* Table section */}
-        <div className="h-[70vh] flex flex-col">
-          <table className="w-full">
+        <div className="h-[75vh] flex flex-col">
+          <table className="w-full table-fixed">
             <thead>
-              <tr className="bg-[#A2AADB] leading-3">
+              <tr className="bg-green-800 leading-3">
                 <th className="font-medium text-sm border border-gray-300 py-0.5 w-10 text-center">
                   S.No
                 </th>
-                <th className="font-medium text-sm border border-gray-300 py-0.5 px-2 w-24">
+                <th className="font-medium text-sm border border-gray-300 py-0.5 px-2 w-32 text-center">
                   Product Code
                 </th>
-                <th className="font-medium text-sm border border-gray-300 py-0.5 px-2 w-[300px] text-center">
+                <th className="font-medium text-sm border border-gray-300 py-0.5 px-2 w-[250px] text-center">
                   Product Name
                 </th>
-                <th className="font-medium text-sm border border-gray-300 py-0.5 px-2 text-center w-12">
+                <th className="font-medium text-sm border border-gray-300 py-0.5 px-2 text-center w-20">
                   Qty
                 </th>
-                <th className="font-medium text-sm border border-gray-300 py-0.5 w-10">UOM</th>
-                <th className="font-medium text-sm border border-gray-300 py-0.5 px-2 text-center w-[85px]">
+                <th className="font-medium text-sm border border-gray-300 py-0.5 w-12 text-center">
+                  UOM
+                </th>
+                <th className="font-medium text-sm border border-gray-300 py-0.5 px-2 text-center w-24">
                   Rate
                 </th>
-                <th className="font-medium text-sm border border-gray-300 py-0.5 w-[86px]">
+                <th className="font-medium text-sm border border-gray-300 py-0.5 w-28 text-center">
                   Amount
                 </th>
                 <th className="font-medium text-sm border border-gray-300 py-0.5 text-center w-16">
                   HSN
                 </th>
-                <th className="font-medium text-sm border border-gray-300 py-0.5 px-1 w-14 text-center">
+                <th className="font-medium text-sm border border-gray-300 py-0.5 px-1 w-16 text-center">
                   GST %
                 </th>
-                <th className="font-medium text-sm border border-gray-300 py-0.5 text-center w-16">
-                  Dely.Date
+                <th className="font-medium text-sm border border-gray-300 py-0.5 px-1 w-20 text-center">
+                  SGST
                 </th>
-                <th className="font-medium text-sm border border-gray-300 py-0.5 text-center w-16">
-                  Dely.Mode
+                <th className="font-medium text-sm border border-gray-300 py-0.5 px-1 w-20 text-center">
+                  CGST
                 </th>
-                <th className="font-medium text-sm border border-gray-300 py-0.5 px-2 text-center w-[60px]">
+                <th className="font-medium text-sm border border-gray-300 py-0.5 px-1 w-20 text-center">
+                  IGST
+                </th>
+                <th className="font-medium text-sm border border-gray-300 py-0.5 text-center w-20">
+                  DL. Date
+                </th>
+                <th className="font-medium text-sm border border-gray-300 py-0.5 text-center w-28">
+                  DL. Mode
+                </th>
+                <th className="font-medium text-sm border border-gray-300 py-0.5 px-2 text-center w-16">
                   Action
                 </th>
               </tr>
@@ -943,130 +1339,526 @@ const Order = ({ onBack }) => {
 
           {/* Scrollable table body container */}
           <div className={`flex-1 overflow-y-auto ${orderData.length > 15 ? 'max-h-[65vh]' : ''}`}>
-            <table className="w-full">
+            <table className="w-full table-fixed">
               <tbody>
-                {orderData.length === 0 ? (
-                  <tr>
-                    <td colSpan={12} className="text-center border border-gray-300">
-                      <div className="flex items-center justify-center p-5">
-                        <AiFillExclamationCircle className="text-red-700 text-[28px] mx-1" />
-                        No Records Found...
-                      </div>
+                {/* Existing rows */}
+                {orderData.map((row, rowIndex) => (
+                  <tr key={rowIndex} className="leading-4 hover:bg-gray-50">
+                    <td className="border border-gray-400 text-center text-sm w-10 align-middle">
+                      {rowIndex + 1}
+                    </td>
+
+                    {/* Product Code (Select) */}
+                    <td className="border border-gray-400 text-left text-sm w-32 align-middle p-0.5">
+                      <Select
+                        ref={el => {
+                          selectRefs.current[rowIndex * totalCols + 1] = el;
+                        }}
+                        value={row.item}
+                        options={itemOptions}
+                        getOptionLabel={option =>
+                          option.label || `${option.item_code} - ${option.stock_item_name}`
+                        }
+                        getOptionValue={option => option.item_code}
+                        onChange={selected => handleItemSelect(selected, rowIndex)}
+                        // onKeyDown={e => handleKeyDownTable(e, rowIndex, 1, 'select')}
+                        placeholder=""
+                        styles={tableSelectStyles}
+                        components={{
+                          DropdownIndicator: () => null,
+                          IndicatorSeparator: () => null,
+                        }}
+                        formatOptionLabel={(option, { context }) => {
+                          if (context === 'menu') {
+                            return (
+                              option.label || `${option.item_code} - ${option.stock_item_name}`
+                            );
+                          }
+                          return option.item_code;
+                        }}
+                        menuPortalTarget={document.body}
+                      />
+                    </td>
+
+                    {/* Product Name */}
+                    <td className="border border-gray-400 px-2 text-sm w-[250px] align-middle p-0">
+                      <input
+                        ref={el => {
+                          inputRefs.current[rowIndex * totalCols + 2] = el;
+                        }}
+                        type="text"
+                        readOnly
+                        value={row.itemName || ''}
+                        className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent"
+                        onKeyDown={e => handleKeyDownTable(e, rowIndex, 2)}
+                      />
+                    </td>
+
+                    {/* Quantity */}
+                    <td className="border border-gray-400 text-sm bg-[#F8F4EC] w-20 align-middle p-0">
+                      <input
+                        ref={el => {
+                          inputRefs.current[rowIndex * totalCols + 3] = el;
+                        }}
+                        type="text"
+                        value={row.itemQty}
+                        onChange={e => handleFieldChange('itemQty', e.target.value, rowIndex)}
+                        onKeyDown={e => handleKeyDownTable(e, rowIndex, 3)}
+                        className="w-full h-full pl-2 pr-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-right"
+                        min="0"
+                      />
+                    </td>
+
+                    {/* UOM */}
+                    <td className="border border-gray-400 text-center text-[13px] w-12 align-middle p-0">
+                      <input
+                        ref={el => {
+                          inputRefs.current[rowIndex * totalCols + 4] = el;
+                        }}
+                        type="text"
+                        readOnly
+                        value={row.uom || "No's"}
+                        className="w-full h-full text-center focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent"
+                        onKeyDown={e => handleKeyDownTable(e, rowIndex, 4)}
+                      />
+                    </td>
+
+                    {/* Rate */}
+                    <td className="border border-gray-400 text-sm w-24 align-middle p-0">
+                      <input
+                        ref={el => {
+                          inputRefs.current[rowIndex * totalCols + 5] = el;
+                        }}
+                        type="text"
+                        value={formatCurrency(row.rate)}
+                        onChange={e => handleFieldChange('rate', e.target.value, rowIndex)}
+                        onKeyDown={e => handleKeyDownTable(e, rowIndex, 5)}
+                        className="w-full h-full pl-1 pr-2 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-right"
+                        min="0"
+                        step="0.01"
+                        readOnly
+                      />
+                    </td>
+
+                    {/* Amount */}
+                    <td className="border border-gray-400 text-right text-[12px] w-28 align-middle p-0 pr-2">
+                      <input
+                        ref={el => {
+                          inputRefs.current[rowIndex * totalCols + 6] = el;
+                        }}
+                        type="text"
+                        readOnly
+                        value={formatCurrency(row.amount)}
+                        className="w-full h-full text-right focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent"
+                        onKeyDown={e => handleKeyDownTable(e, rowIndex, 6)}
+                      />
+                    </td>
+
+                    {/* HSN */}
+                    <td className="border border-gray-400 text-sm w-16 align-middle p-0">
+                      <input
+                        ref={el => {
+                          inputRefs.current[rowIndex * totalCols + 7] = el;
+                        }}
+                        type="text"
+                        value={row.hsn}
+                        onChange={e => handleFieldChange('hsn', e.target.value, rowIndex)}
+                        onKeyDown={e => handleKeyDownTable(e, rowIndex, 7)}
+                        className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-center"
+                        readOnly
+                      />
+                    </td>
+
+                    {/* GST */}
+                    <td className="border border-gray-400 text-sm w-16 align-middle p-0">
+                      <input
+                        ref={el => {
+                          inputRefs.current[rowIndex * totalCols + 8] = el;
+                        }}
+                        type="text"
+                        value={row.gst}
+                        onChange={e => handleFieldChange('gst', e.target.value, rowIndex)}
+                        onKeyDown={e => handleKeyDownTable(e, rowIndex, 8)}
+                        className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-center"
+                        readOnly
+                      />
+                    </td>
+
+                    {/* SGST */}
+                    <td className="border border-gray-400 text-sm w-20 align-middle p-0">
+                      <input
+                        ref={el => {
+                          inputRefs.current[rowIndex * totalCols + 9] = el;
+                        }}
+                        type="text"
+                        value={formatCurrency(row.sgst)}
+                        onChange={e => handleFieldChange('sgst', e.target.value, rowIndex)}
+                        onKeyDown={e => handleKeyDownTable(e, rowIndex, 9)}
+                        className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-center"
+                        readOnly
+                      />
+                    </td>
+
+                    {/* CGST */}
+                    <td className="border border-gray-400 text-sm w-20 align-middle p-0">
+                      <input
+                        ref={el => {
+                          inputRefs.current[rowIndex * totalCols + 10] = el;
+                        }}
+                        type="text"
+                        value={formatCurrency(row.cgst)}
+                        onChange={e => handleFieldChange('cgst', e.target.value, rowIndex)}
+                        onKeyDown={e => handleKeyDownTable(e, rowIndex, 10)}
+                        className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-center"
+                        readOnly
+                      />
+                    </td>
+
+                    {/* IGST */}
+                    <td className="border border-gray-400 text-sm w-20 align-middle p-0">
+                      <input
+                        ref={el => {
+                          inputRefs.current[rowIndex * totalCols + 11] = el;
+                        }}
+                        type="text"
+                        value={row.igst}
+                        onChange={e => handleFieldChange('igst', e.target.value, rowIndex)}
+                        onKeyDown={e => handleKeyDownTable(e, rowIndex, 11)}
+                        className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-center"
+                        readOnly
+                      />
+                    </td>
+
+                    {/* Delivery Date */}
+                    <td className="border border-gray-400 text-sm w-20 align-middle p-0">
+                      <input
+                        ref={el => {
+                          inputRefs.current[rowIndex * totalCols + 12] = el;
+                        }}
+                        type="text"
+                        value={row.delivery_date}
+                        onChange={e => handleFieldChange('delivery_date', e.target.value, rowIndex)}
+                        onKeyDown={e => handleKeyDownTable(e, rowIndex, 12)}
+                        className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-center"
+                        placeholder=""
+                      />
+                    </td>
+
+                    {/* Delivery Mode */}
+                    <td className="border border-gray-400 text-sm w-28 align-middle p-0">
+                      <input
+                        ref={el => {
+                          inputRefs.current[rowIndex * totalCols + 13] = el;
+                        }}
+                        type="text"
+                        value={row.delivery_mode}
+                        onChange={e => handleFieldChange('delivery_mode', e.target.value, rowIndex)}
+                        onKeyDown={e => handleKeyDownTable(e, rowIndex, 13)}
+                        className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-center"
+                        placeholder="Mode"
+                      />
+                    </td>
+
+                    {/* Action */}
+                    <td className="border border-gray-400 text-center text-sm w-16 align-middle">
+                      <button
+                        onClick={() => handleRemoveItem(rowIndex)}
+                        className="text-red-500 hover:text-red-600 p-1"
+                        title="Delete Item"
+                      >
+                        <AiFillDelete size={18} />
+                      </button>
                     </td>
                   </tr>
-                ) : (
-                  orderData.map((item, index) => (
-                    <tr key={index} className="leading-12">
-                      <td className="border border-gray-400 text-center text-sm w-[53px]">
-                        {index + 1}
-                      </td>
-                      <td className="border border-gray-400 text-left pl-1 text-sm w-[126px]">
-                        {item.itemCode}
-                      </td>
-                      <td className="border border-gray-400 px-2 text-sm w-[399px]">
-                        {item.itemName}
-                      </td>
-                      <td className="border border-gray-400 px-2 text-right text-sm bg-[#F8F4EC] w-[64px]">
-                        <input
-                          type="text"
-                          value={item.itemQty === 0 ? '' : item.itemQty}
-                          onChange={e => {
-                            const value = e.target.value.replace(/[^\d]/g, '');
-                            handleQuantityChange(index, value);
-                          }}
-                          onBlur={e => {
-                            if (e.target.value === '') {
-                              handleQuantityChange(index, '1');
-                            }
-                          }}
-                          className="w-[47px] text-right border-none outline-none bg-transparent px-1"
-                        />
-                      </td>
-                      <td className="border border-gray-400 text-center text-sm w-[53px]">
-                        {item.uom}
-                      </td>
-                      <td className="border border-gray-400  px-2 text-right text-sm w-[112px]">
-                        {formatCurrency(item.rate)}
-                      </td>
-                      <td className="border border-gray-400 px-2 text-right text-sm w-[114px]">
-                        {formatCurrency(item.amount)}
-                      </td>
-                      <td className="border border-gray-400 text-center text-sm w-[85px]">
-                        {item.hsn}
-                      </td>
-                      <td className="border border-gray-400 text-center text-sm w-[74px]">
-                        {item.gst}
-                      </td>
-                      <td className="border border-gray-400 text-center text-sm w-[85px]">
-                        {formatDate(item.delivery_date)}
-                      </td>
-                      <td className="border border-gray-400 text-center text-sm w-[90px]">
-                        {item.delivery_mode}
-                      </td>
-                      <td className="border border-gray-400 text-center text-sm">
-                        <button
-                          onClick={() => handleRemoveItem(index)}
-                          className="text-red-500 hover:text-red-600 p-1"
-                        >
-                          <AiFillDelete size={18} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
+                ))}
+
+                {/* Add new row (editing row) */}
+                <tr className="leading-12 bg-yellow-50 hover:bg-yellow-100">
+                  <td className="border border-gray-400 text-center text-sm w-10 align-middle">
+                    {orderData.length + 1}
+                  </td>
+
+                  {/* Product Code (Select) - Editing Row */}
+                  <td className="border border-gray-400 text-left text-sm w-32 align-middle p-0.5">
+                    <Select
+                      ref={editingRowSelectRef}
+                      value={editingRow.item}
+                      options={itemOptions}
+                      getOptionLabel={option =>
+                        option.label || `${option.item_code} - ${option.stock_item_name}`
+                      }
+                      getOptionValue={option => option.item_code}
+                      onChange={selected => handleItemSelect(selected)}
+                      // onKeyDown={e => handleEditingRowKeyDown(e, 1, 'select')}
+                      placeholder=""
+                      styles={tableSelectStyles}
+                      components={{ DropdownIndicator: () => null, IndicatorSeparator: () => null }}
+                      formatOptionLabel={(option, { context }) => {
+                        if (context === 'menu') {
+                          return option.label || `${option.item_code} - ${option.stock_item_name}`;
+                        }
+                        return option.item_code;
+                      }}
+                      menuPortalTarget={document.body}
+                    />
+                  </td>
+
+                  {/* Product Name - Editing Row */}
+                  <td className="border border-gray-400 px-2 text-sm w-[250px] align-middle p-0">
+                    <input
+                      ref={el => (editingRowInputRefs.current.itemName = el)}
+                      type="text"
+                      readOnly
+                      value={editingRow.item?.stock_item_name || ''}
+                      className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent"
+                      placeholder=""
+                      onKeyDown={e => handleEditingRowKeyDown(e, 2)}
+                    />
+                  </td>
+
+                  {/* Quantity - Editing Row */}
+                  <td className="border border-gray-400 text-sm bg-[#F8F4EC] w-20 align-middle p-0">
+                    <input
+                      ref={el => (editingRowInputRefs.current.quantity = el)}
+                      type="text"
+                      value={editingRow.quantity}
+                      onChange={e => handleFieldChange('quantity', e.target.value)}
+                      onKeyDown={e => handleEditingRowKeyDown(e, 3)}
+                      className="w-full h-full pl-2 pr-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-right"
+                      min="0"
+                      placeholder=""
+                    />
+                  </td>
+
+                  {/* UOM - Editing Row */}
+                  <td className="border border-gray-400 text-center text-xs w-12 align-middle p-0">
+                    <input
+                      ref={el => (editingRowInputRefs.current.uom = el)}
+                      type="text"
+                      readOnly
+                      value={editingRow.item?.uom || "No's"}
+                      className="w-full h-full text-center focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent"
+                      onKeyDown={e => handleEditingRowKeyDown(e, 4)}
+                    />
+                  </td>
+
+                  {/* Rate - Editing Row */}
+                  <td className="border border-gray-400 text-sm w-24 align-middle p-0">
+                    <input
+                      ref={el => (editingRowInputRefs.current.rate = el)}
+                      type="text"
+                      value={formatCurrency(editingRow.rate)}
+                      onChange={e => handleFieldChange('rate', e.target.value)}
+                      onKeyDown={e => handleEditingRowKeyDown(e, 5)}
+                      className="w-full h-full pl-1 pr-2 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-right"
+                      min="0"
+                      step="0.01"
+                      placeholder=""
+                      readOnly
+                    />
+                  </td>
+
+                  {/* Amount - Editing Row */}
+                  <td className="border border-gray-400 text-right text-xs w-28 align-middle p-0 pr-2">
+                    <input
+                      ref={el => (editingRowInputRefs.current.amount = el)}
+                      type="text"
+                      readOnly
+                      value={formatCurrency(editingRow.amount)}
+                      className="w-full h-full text-right focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent"
+                      onKeyDown={e => handleEditingRowKeyDown(e, 6)}
+                    />
+                  </td>
+
+                  {/* HSN - Editing Row */}
+                  <td className="border border-gray-400 text-sm w-16 align-middle p-0">
+                    <input
+                      ref={el => (editingRowInputRefs.current.hsn = el)}
+                      type="text"
+                      value={editingRow.hsn}
+                      onChange={e => handleFieldChange('hsn', e.target.value)}
+                      onKeyDown={e => handleEditingRowKeyDown(e, 7)}
+                      className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-center"
+                      placeholder=""
+                      readOnly
+                    />
+                  </td>
+
+                  {/* GST - Editing Row */}
+                  <td className="border border-gray-400 text-sm w-16 align-middle p-0">
+                    <input
+                      ref={el => (editingRowInputRefs.current.gst = el)}
+                      type="text"
+                      value={editingRow.gst}
+                      onChange={e => handleFieldChange('gst', e.target.value)}
+                      onKeyDown={e => handleEditingRowKeyDown(e, 8)}
+                      className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-center"
+                      placeholder=""
+                      readOnly
+                    />
+                  </td>
+
+                  {/* SGST - Editing Row */}
+                  <td className="border border-gray-400 text-sm w-20 align-middle p-0">
+                    <input
+                      ref={el => (editingRowInputRefs.current.sgst = el)}
+                      type="text"
+                      value={formatCurrency(editingRow.sgst)}
+                      onChange={e => handleFieldChange('sgst', e.target.value)}
+                      onKeyDown={e => handleEditingRowKeyDown(e, 9)}
+                      className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-center"
+                      placeholder=""
+                      readOnly
+                    />
+                  </td>
+
+                  {/* CGST - Editing Row */}
+                  <td className="border border-gray-400 text-sm w-20 align-middle p-0">
+                    <input
+                      ref={el => (editingRowInputRefs.current.cgst = el)}
+                      type="text"
+                      value={formatCurrency(editingRow.cgst)}
+                      onChange={e => handleFieldChange('cgst', e.target.value)}
+                      onKeyDown={e => handleEditingRowKeyDown(e, 10)}
+                      className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-center"
+                      placeholder=""
+                      readOnly
+                    />
+                  </td>
+
+                  {/* IGST - Editing Row */}
+                  <td className="border border-gray-400 text-sm w-20 align-middle p-0">
+                    <input
+                      ref={el => (editingRowInputRefs.current.igst = el)}
+                      type="text"
+                      value={formatCurrency(editingRow.igst)}
+                      onChange={e => handleFieldChange('igst', e.target.value)}
+                      onKeyDown={e => handleEditingRowKeyDown(e, 11)}
+                      className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-center"
+                      placeholder=""
+                      readOnly
+                    />
+                  </td>
+
+                  {/* Delivery Date - Editing Row */}
+                  <td className="border border-gray-400 text-sm w-20 align-middle p-0">
+                    <input
+                      ref={el => (editingRowInputRefs.current.delivery_date = el)}
+                      type="text"
+                      value={editingRow.delivery_date}
+                      onChange={e => handleFieldChange('delivery_date', e.target.value)}
+                      onKeyDown={e => handleEditingRowKeyDown(e, 12)}
+                      className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-center"
+                      placeholder=""
+                    />
+                  </td>
+
+                  {/* Delivery Mode - Editing Row */}
+                  <td className="border border-gray-400 text-sm w-28 align-middle p-0">
+                    <input
+                      ref={el => (editingRowInputRefs.current.delivery_mode = el)}
+                      type="text"
+                      value={editingRow.delivery_mode}
+                      onChange={e => handleFieldChange('delivery_mode', e.target.value)}
+                      onKeyDown={e => handleEditingRowKeyDown(e, 13)}
+                      className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-center"
+                      placeholder=""
+                    />
+                  </td>
+
+                  {/* Action - Editing Row */}
+                  <td className="border border-gray-400 text-center text-sm w-16 align-middle">
+                    <button
+                      ref={addButtonRef}
+                      onClick={handleAddRow}
+                      onKeyDown={handleAddButtonKeyDown}
+                      className="text-green-500 hover:text-green-600 p-1 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50"
+                      title="Add Item"
+                      disabled={!editingRow.item || !editingRow.quantity}
+                      tabIndex={0}
+                    >
+                      <AiFillPlusCircle size={18} />
+                    </button>
+                  </td>
+                </tr>
               </tbody>
             </table>
           </div>
         </div>
 
-        {/* Footer section - remove the mt-[320px] */}
-        <div className="h-[7vh] flex border-t items-center">
-          <div className="w-[500px] px-0.5">
-            <div className="relative flex gap-2">
-              <textarea
-                name="remarks"
-                id="remarks"
-                placeholder="Remarks"
-                value={remarks}
-                onChange={e => setRemarks(e.target.value)}
-                className="border border-[#932F67] resize-none md:w-[350px] outline-none rounded px-1  peer h-[26px] bg-[#F8F4EC] mb-1 ml-1"
-              ></textarea>
+        {/* Footer section */}
+        <div className="h-[10vh] flex flex-col border-t">
+          {/* row 1 */}
+          <div className="flex items-center">
+            <div className="flex justify-between w-full px-0.5">
+              <div className="w-[400px] px-0.5">
+                <div className="relative flex gap-2 mt-1">
+                  <textarea
+                    name="remarks"
+                    id="remarks"
+                    placeholder="Remarks"
+                    value={remarks}
+                    onChange={e => setRemarks(e.target.value)}
+                    onKeyDown={handleRemarksKeyDown}
+                    className="border border-[#932F67] resize-none md:w-[350px] outline-none rounded px-1  peer h-[26px] bg-[#F8F4EC] mb-1 ml-1"
+                  ></textarea>
 
-              <div>
-                <label htmlFor="" className="text-sm font-medium ml-3">
-                  Status :{' '}
-                </label>
-                <select
-                  name=""
-                  id=""
-                  disabled={true}
-                  className="outline-none appearance-none border border-[#932F67] px-1 text-sm rounded ml-1 mt-0.5"
-                >
-                  <option value="">Pending</option>
-                </select>
+                  <div className="w-[300px]">
+                    <label htmlFor="" className="text-sm font-medium ml-3">
+                      Status :{' '}
+                    </label>
+                    <select
+                      name=""
+                      id=""
+                      disabled={true}
+                      className="outline-none appearance-none border border-[#932F67] px-1 text-sm rounded ml-1 mt-0.5"
+                    >
+                      <option value="">Pending</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div className="">
+                <p className="font-medium mt-1.5">Total :</p>
+              </div>
+              <div className="w-[1000px] px-0.5 py-1">
+                <table className="w-full border-b mb-1">
+                  <tfoot>
+                    <tr className="*:border-[#932F67]">
+                      <td className="text-right border w-20 px-1">{totals.qty}</td>
+                      <td className="text-right border w-20 px-1">
+                        {formatCurrency(totals.amount)}
+                      </td>
+                      <td className="text-right border w-20 px-1">
+                        {formatCurrency(totals.sgstAmt)}
+                      </td>
+                      <td className="text-right border w-20 px-1">
+                        {formatCurrency(totals.cgstAmt)}
+                      </td>
+                      <td className="text-right border w-20 px-1">
+                        {formatCurrency(totals.igstAmt)}
+                      </td>
+                      <td className="border w-28 px-1 text-right">
+                        {formatCurrency(totals.totalAmount)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
               </div>
             </div>
           </div>
-          <div className="">
-            <p className="font-medium pr-2 mb-0.5">Total</p>
-          </div>
-          <div className="w-[375px] px-0.5 py-1">
-            <table className="w-full border-b mb-1">
-              <tfoot>
-                <tr className="*:border-[#932F67]">
-                  <td className="text-right border w-6 px-1">{totals.qty}</td>
-                  <td className="text-right border w-20 px-1">{formatCurrency(totals.amount)}</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-          <div className=" mb-1 -ml-[-345px]">
-            <button
-              onClick={handleSubmit}
-              className="bg-[#693382] text-white px-4 rounded-[6px] py-0.5 outline-none cursor-pointer"
-            >
-              Save
-            </button>
+          {/* row 2 */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <div className="mb-1 -ml-[-1410px] mr-1">
+                <button
+                  onClick={handleSubmit}
+                  className="bg-[#693382] text-white px-5 rounded-[6px] py-1 outline-none cursor-pointer"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>

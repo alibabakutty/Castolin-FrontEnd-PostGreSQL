@@ -10,20 +10,7 @@ export default defineConfig({
   ],
 
   build: {
-    rollupOptions: {
-      output: {
-        manualChunks(id) {
-          if (id.includes("node_modules")) {
-            if (id.includes("react")) return "react";
-            if (id.includes("firebase")) return "firebase";
-            if (id.includes("react-select")) return "react-select";
-            if (id.includes("lodash")) return "lodash";
-            return "vendor";
-          }
-        },
-      },
-    },
-    chunkSizeWarningLimit: 1000, // optional
+    chunkSizeWarningLimit: 1000,
   },
 
   server: {

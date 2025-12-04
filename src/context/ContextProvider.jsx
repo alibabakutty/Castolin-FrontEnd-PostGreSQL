@@ -273,6 +273,7 @@ const ContextProvider = ({ children }) => {
         ...updates,
         firebase_uid: firebaseUser.uid,
         email: email,
+        status: 'active',
       };
 
       const res = await api.put(`/distributors/${usercode}`, updatePayload, {
@@ -313,6 +314,7 @@ const ContextProvider = ({ children }) => {
         ...updates,
         firebase_uid: firebaseUser.uid,
         email: email,
+        status: 'active',
       };
 
       const res = await api.put(`corporates/${usercode}`, updatePayload, {
