@@ -16,7 +16,6 @@ const Order = ({ onBack }) => {
   const [customerOptions, setCustomerOptions] = useState([]);
   const [orderData, setOrderData] = useState([]);
   const [remarks, setRemarks] = useState('');
-
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const customerSelectRef = useRef(null);
   const isSubmitttingRef = useRef(false);
@@ -62,6 +61,12 @@ const Order = ({ onBack }) => {
   //   const year = date.getFullYear();
   //   return `${day}-${month}-${year}`;
   // };
+
+  useEffect(() => {
+  console.log('Selected Customer:', selectedCustomer);
+  console.log('Distributor User:', distributorUser);
+  console.log('Is Tamil Nadu State:', isTamilNaduState());
+}, [selectedCustomer, distributorUser]);
 
   useEffect(() => {
     const handleKeyDown = e => {
@@ -176,7 +181,11 @@ const Order = ({ onBack }) => {
     const fetchCustomers = async () => {
       try {
         const response = await api.get('/customer');
-        setCustomerOptions(response.data);
+        const customerWithState = response.data.map(customer => ({
+          ...customer,
+          state: customer.state || '',
+        }))
+        setCustomerOptions(customerWithState);
       } catch (error) {
         console.error('Error fetching customers:', error);
       }
@@ -185,138 +194,215 @@ const Order = ({ onBack }) => {
   }, []);
 
   const handleItemSelect = (selected, index) => {
-    if (index === undefined) {
-      // For editing row
-      setEditingRow(prev => {
-        const updated = {
-          ...prev,
-          item: selected,
-          rate: selected?.rate || '',
-          hsn: selected?.hsn_code || selected?.hsn || '',
-          gst: selected?.gst || '18',
-          sgst: '', // Will calculate based on state
-          cgst: '', // Will calculate based on state
-          gst: selected?.gst || '18', // Keep GST percentage
-          sgst: '', // Will calculate amount
-          cgst: '', // Will calculate amount
-          igst: selected?.igst || '',
-        };
+  if (index === undefined) {
+    // For editing row
+    setEditingRow(prev => {
+      const updated = {
+        ...prev,
+        item: selected,
+        rate: selected?.rate || '',
+        hsn: selected?.hsn_code || selected?.hsn || '',
+        gst: selected?.gst || '18',
+        sgst: '', // Will calculate based on state
+        cgst: '', // Will calculate based on state
+        igst: '', // Will calculate based on state
+      };
 
-        if (prev.quantity && selected?.rate) {
-          const amount = (Number(prev.quantity) || 0) * (Number(selected.rate) || 0);
-          updated.amount = amount;
+      if (prev.quantity && selected?.rate) {
+        const amount = (Number(prev.quantity) || 0) * (Number(selected.rate) || 0);
+        updated.amount = amount;
 
-          // Get customer state
-          const customerState = isDistributorRoute
-            ? distributorUser?.state || ''
-            : selectedCustomer?.state || '';
-
-          // If state is "Tamil Nadu", split GST into SGST and CGST
-          if (
-            customerState.toLowerCase() === 'tamil nadu' ||
-            customerState.toLowerCase() === 'tn'
-          ) {
-            const halfGST = gstAmount / 2;
-            updated.sgst = halfGST.toFixed(2);
-            updated.cgst = halfGST.toFixed(2);
-            updated.igst = ''; // Clear IGST for same state
-          } else {
-            // For other states, use IGST
-            updated.sgst = ''; // Clear SGST for inter-state
-            updated.cgst = ''; // Clear CGST for inter-state
-            updated.igst = gstAmount.toFixed(2);
-          }
-          // Calculate GST AMOUNT values (not percentages)
+        // Check if state is Tamil Nadu
+        if (isTamilNaduState()) {
+          // Calculate SGST and CGST for Tamil Nadu
           const gstPercentage = Number(selected?.gst || 18);
           const gstAmount = amount * (gstPercentage / 100);
           const halfGST = gstAmount / 2;
-
-          // Set SGST and CGST as AMOUNT values (not percentages)
           updated.sgst = halfGST.toFixed(2);
           updated.cgst = halfGST.toFixed(2);
-
-        }
-
-        return updated;
-      });
-
-      // After selecting item, focus on quantity field
-      setTimeout(() => {
-        editingRowInputRefs.current.quantity?.focus();
-      }, 100);
-    } else {
-      // For existing rows
-      const updatedRows = [...orderData];
-      updatedRows[index].item = selected;
-      updatedRows[index].itemCode = selected?.item_code || '';
-      updatedRows[index].itemName = selected?.stock_item_name || '';
-      updatedRows[index].rate = selected?.rate || '';
-      updatedRows[index].hsn = selected?.hsn_code || selected?.hsn || '';
-      updatedRows[index].gst = selected?.gst || '18';
-      updatedRows[index].sgst = '';
-      updatedRows[index].cgst = '';
-      updatedRows[index].gst = selected?.gst || '18'; // Keep GST percentage
-      updatedRows[index].sgst = ''; // Will calculate amount
-      updatedRows[index].cgst = ''; // Will calculate amount
-      updatedRows[index].igst = selected?.igst || '';
-      updatedRows[index].uom = selected?.uom || "No's";
-
-      if (updatedRows[index].itemQty && selected?.rate) {
-        const amount = (Number(updatedRows[index].itemQty) || 0) * (Number(selected.rate) || 0);
-        updatedRows[index].amount = amount;
-
-        // Get customer state
-        const customerState = isDistributorRoute
-          ? distributorUser?.state || ''
-          : selectedCustomer?.state || '';
-
-
-        // If state is "Tamil Nadu", split GST into SGST and CGST
-        if (customerState.toLowerCase() === 'tamil nadu' || customerState.toLowerCase() === 'tn') {
-          const halfGST = gstAmount / 2;
-          updatedRows[index].sgst = halfGST.toFixed(2);
-          updatedRows[index].cgst = halfGST.toFixed(2);
-          updatedRows[index].igst = ''; // Clear IGST for same state
+          updated.igst = ''; // Clear IGST
         } else {
-          // For other states, use IGST
-          updatedRows[index].sgst = ''; // Clear SGST for inter-state
-          updatedRows[index].cgst = ''; // Clear CGST for inter-state
-          updatedRows[index].igst = gstAmount.toFixed(2);
+          // Calculate IGST for other states
+          const gstPercentage = Number(selected?.gst || 18);
+          const gstAmount = amount * (gstPercentage / 100);
+          updated.sgst = ''; // Clear SGST
+          updated.cgst = ''; // Clear CGST
+          updated.igst = gstAmount.toFixed(2);
         }
-        // Calculate GST AMOUNT values (not percentages)
+      }
+
+      return updated;
+    });
+
+    // After selecting item, focus on quantity field
+    setTimeout(() => {
+      editingRowInputRefs.current.quantity?.focus();
+    }, 100);
+  } else {
+    // For existing rows
+    const updatedRows = [...orderData];
+    updatedRows[index].item = selected;
+    updatedRows[index].itemCode = selected?.item_code || '';
+    updatedRows[index].itemName = selected?.stock_item_name || '';
+    updatedRows[index].rate = selected?.rate || '';
+    updatedRows[index].hsn = selected?.hsn_code || selected?.hsn || '';
+    updatedRows[index].gst = selected?.gst || '18';
+    updatedRows[index].sgst = '';
+    updatedRows[index].cgst = '';
+    updatedRows[index].igst = '';
+    updatedRows[index].uom = selected?.uom || "No's";
+
+    if (updatedRows[index].itemQty && selected?.rate) {
+      const amount = (Number(updatedRows[index].itemQty) || 0) * (Number(selected.rate) || 0);
+      updatedRows[index].amount = amount;
+
+      // Check if state is Tamil Nadu
+      if (isTamilNaduState()) {
+        // Calculate SGST and CGST for Tamil Nadu
         const gstPercentage = Number(selected?.gst || 18);
         const gstAmount = amount * (gstPercentage / 100);
         const halfGST = gstAmount / 2;
-
-        // Set SGST and CGST as AMOUNT values (not percentages)
         updatedRows[index].sgst = halfGST.toFixed(2);
         updatedRows[index].cgst = halfGST.toFixed(2);
+        updatedRows[index].igst = ''; // Clear IGST
+      } else {
+        // Calculate IGST for other states
+        const gstPercentage = Number(selected?.gst || 18);
+        const gstAmount = amount * (gstPercentage / 100);
+        updatedRows[index].sgst = ''; // Clear SGST
+        updatedRows[index].cgst = ''; // Clear CGST
+        updatedRows[index].igst = gstAmount.toFixed(2);
       }
-
-      setOrderData(updatedRows);
-
-      // After selecting item, focus on quantity field
-      setTimeout(() => {
-        const quantityIndex = index * totalCols + 3;
-        inputRefs.current[quantityIndex]?.focus();
-      }, 100);
     }
-  };
+
+    setOrderData(updatedRows);
+
+    // After selecting item, focus on quantity field
+    setTimeout(() => {
+      const quantityIndex = index * totalCols + 3;
+      inputRefs.current[quantityIndex]?.focus();
+    }, 100);
+  }
+};
 
   const handleCustomerSelect = selected => {
-    setCustomerName(selected);
-    setSelectedCustomer(selected);
+  setCustomerName(selected);
+  setSelectedCustomer(selected);
 
-    // If we have a distributor user, we should get their state too
-    if (isDistributorRoute && distributorUser) {
-      // Assuming distributorUser has state information
-      setSelectedCustomer({
-        ...selected,
-        state: distributorUser.state || '',
-      });
+  // Recalculate GST for all items when customer changes
+  recalculateGSTForAllItems(selected?.state || '');
+};
+
+// Helper function to recalculate GST for all items
+const recalculateGSTForAllItems = (customerState) => {
+  const isTN = customerState.toLowerCase().trim() === 'tamil nadu' || 
+               customerState.toLowerCase().trim() === 'tn' ||
+               customerState.toLowerCase().trim() === 'tamilnadu';
+
+  // Update editing row
+  setEditingRow(prev => {
+    if (prev.item && prev.quantity && prev.rate) {
+      const amount = (Number(prev.quantity) || 0) * (Number(prev.rate) || 0);
+      const gstPercentage = Number(prev.gst || 18);
+      const gstAmount = amount * (gstPercentage / 100);
+      
+      let updated = { ...prev, amount };
+      
+      if (isTN) {
+        const halfGST = gstAmount / 2;
+        updated.sgst = halfGST.toFixed(2);
+        updated.cgst = halfGST.toFixed(2);
+        updated.igst = '';
+      } else {
+        updated.sgst = '';
+        updated.cgst = '';
+        updated.igst = gstAmount.toFixed(2);
+      }
+      
+      return updated;
     }
+    return prev;
+  });
+  
+  // Update existing rows
+  if (orderData.length > 0) {
+    const updatedRows = orderData.map(row => {
+      if (row.itemQty && row.rate) {
+        const amount = (Number(row.itemQty) || 0) * (Number(row.rate) || 0);
+        const gstPercentage = Number(row.gst || 18);
+        const gstAmount = amount * (gstPercentage / 100);
+        
+        let updatedRow = { ...row, amount };
+        
+        if (isTN) {
+          const halfGST = gstAmount / 2;
+          updatedRow.sgst = halfGST.toFixed(2);
+          updatedRow.cgst = halfGST.toFixed(2);
+          updatedRow.igst = '';
+        } else {
+          updatedRow.sgst = '';
+          updatedRow.cgst = '';
+          updatedRow.igst = gstAmount.toFixed(2);
+        }
+        
+        return updatedRow;
+      }
+      return row;
+    });
+    
+    setOrderData(updatedRows);
+  }
+};
 
-  };
+// Add this validation in your form
+useEffect(() => {
+  if (isDistributorRoute) {
+    if (!distributorUser?.state) {
+      console.warn('Distributor user state is not set. Defaulting to IGST calculation.');
+    }
+  } else {
+    if (customerName && !selectedCustomer?.state) {
+      console.warn('Customer state is not available. Defaulting to IGST calculation.');
+    }
+  }
+}, [distributorUser, customerName, selectedCustomer, isDistributorRoute]);
+
+// When distributor user changes, update GST calculations
+useEffect(() => {
+  if (isDistributorRoute && distributorUser) {
+    const distributorState = distributorUser.state || '';
+    recalculateGSTForAllItems(distributorState);
+  }
+}, [distributorUser, isDistributorRoute]);
+
+// When selected customer changes (non-distributor route)
+useEffect(() => {
+  if (!isDistributorRoute && selectedCustomer) {
+    const customerState = selectedCustomer.state || '';
+    recalculateGSTForAllItems(customerState);
+  }
+}, [selectedCustomer, isDistributorRoute]);
+
+// Helper function to check if state is Tamil Nadu
+const isTamilNaduState = () => {
+  let customerState = '';
+  
+  if (isDistributorRoute) {
+    // For distributor route, check distributorUser state
+    customerState = distributorUser?.state || '';
+    console.log('Distributor State:', customerState);
+  } else {
+    // For non-distributor route, check selected customer state
+    customerState = selectedCustomer?.state || '';
+    console.log('Customer State:', customerState);
+  }
+  
+  // Normalize the state string for comparison
+  const normalizedState = customerState.toLowerCase().trim();
+  return normalizedState === 'tamil nadu' || 
+         normalizedState === 'tn' ||
+         normalizedState === 'tamilnadu';
+};
 
   const handleAddRow = () => {
     if (!editingRow.item || !editingRow.quantity) {
@@ -348,11 +434,7 @@ const Order = ({ onBack }) => {
 
     setOrderData(prev => [...prev, newRow]);
 
-
     // Reset editing row but keep customer state logic in mind
-
-    // Reset editing row
-
     setEditingRow({
       item: null,
       delivery_date: '',
@@ -365,117 +447,80 @@ const Order = ({ onBack }) => {
       sgst: '',
       cgst: '',
       igst: '',
-
     });
 
     // Focus on the new editing row's select
     setTimeout(() => {
       editingRowSelectRef.current?.focus();
     }, 100);
-
-    // Reset editing row refs
-    editingRowInputRefs.current = {};
-
-    // Focus on the new editing row's select
-    setTimeout(() => {
-      editingRowSelectRef.current?.focus();
-    }, 100);
-
-    toast.info('Item added successfully!', {
-      position: 'bottom-right',
-      autoClose: 3000,
-    });
   };
 
   const handleFieldChange = (field, value, index) => {
-    if (index === undefined) {
-      // For editing row
-      setEditingRow(prev => {
-        const updated = { ...prev, [field]: value };
+  if (index === undefined) {
+    // For editing row
+    setEditingRow(prev => {
+      const updated = { ...prev, [field]: value };
 
-        if (field === 'quantity' || field === 'rate' || field === 'gst') {
-          const qty = field === 'quantity' ? value : prev.quantity;
-          const rate = field === 'rate' ? value : prev.rate;
-          const gstPercentage = field === 'gst' ? value : prev.gst;
-
-          const amount = (Number(qty) || 0) * (Number(rate) || 0);
-          updated.amount = amount;
-
-          // Get customer state
-          const customerState = isDistributorRoute
-            ? distributorUser?.state || ''
-            : selectedCustomer?.state || '';
-
-          // If state is "Tamil Nadu", split GST into SGST and CGST
-          if (
-            customerState.toLowerCase() === 'tamil nadu' ||
-            customerState.toLowerCase() === 'tn'
-          ) {
-            const halfGST = gstAmount / 2;
-            updated.sgst = halfGST.toFixed(2);
-            updated.cgst = halfGST.toFixed(2);
-            updated.igst = ''; // Clear IGST for same state
-          } else {
-            // For other states, use IGST
-            updated.sgst = '';
-            updated.cgst = '';
-            updated.igst = gstAmount.toFixed(2);
-          }
-          // Calculate GST AMOUNT values
-          const gstAmount = amount * (Number(gstPercentage || 18) / 100);
-          const halfGST = gstAmount / 2;
-
-          // Set SGST and CGST as AMOUNT values
-          updated.sgst = halfGST.toFixed(2);
-          updated.cgst = halfGST.toFixed(2);
-
-        }
-
-        return updated;
-      });
-    } else {
-      // For existing rows
-      const updatedRows = [...orderData];
-      updatedRows[index][field] = value;
-
-      if (field === 'itemQty' || field === 'rate' || field === 'gst') {
-        const qty = field === 'itemQty' ? value : updatedRows[index].itemQty;
-        const rate = field === 'rate' ? value : updatedRows[index].rate;
-        const gstPercentage = field === 'gst' ? value : updatedRows[index].gst;
+      if (field === 'quantity' || field === 'rate' || field === 'gst') {
+        const qty = field === 'quantity' ? value : prev.quantity;
+        const rate = field === 'rate' ? value : prev.rate;
+        const gstPercentage = field === 'gst' ? value : prev.gst;
 
         const amount = (Number(qty) || 0) * (Number(rate) || 0);
-        updatedRows[index].amount = amount;
+        updated.amount = amount;
 
-        // Get customer state
-        const customerState = isDistributorRoute
-          ? distributorUser?.state || ''
-          : selectedCustomer?.state || '';
-
-        // If state is "Tamil Nadu", split GST into SGST and CGST
-        if (customerState.toLowerCase() === 'tamil nadu' || customerState.toLowerCase() === 'tn') {
+        // Check if state is Tamil Nadu
+        if (isTamilNaduState()) {
+          // Calculate SGST and CGST for Tamil Nadu
+          const gstAmount = amount * (Number(gstPercentage || 18) / 100);
           const halfGST = gstAmount / 2;
-          updatedRows[index].sgst = halfGST.toFixed(2);
-          updatedRows[index].cgst = halfGST.toFixed(2);
-          updatedRows[index].igst = ''; // Clear IGST for same state
+          updated.sgst = halfGST.toFixed(2);
+          updated.cgst = halfGST.toFixed(2);
+          updated.igst = ''; // Clear IGST
         } else {
-          // For other states, use IGST
-          updatedRows[index].sgst = '';
-          updatedRows[index].cgst = '';
-          updatedRows[index].igst = gstAmount.toFixed(2);
+          // Calculate IGST for other states
+          const gstAmount = amount * (Number(gstPercentage || 18) / 100);
+          updated.sgst = '';
+          updated.cgst = '';
+          updated.igst = gstAmount.toFixed(2);
         }
-        // Calculate GST AMOUNT values
-        const gstAmount = amount * (Number(gstPercentage || 18) / 100);
-        const halfGST = gstAmount / 2;
-
-        // Set SGST and CGST as AMOUNT values
-        updatedRows[index].sgst = halfGST.toFixed(2);
-        updatedRows[index].cgst = halfGST.toFixed(2);
-
       }
 
-      setOrderData(updatedRows);
+      return updated;
+    });
+  } else {
+    // For existing rows
+    const updatedRows = [...orderData];
+    updatedRows[index][field] = value;
+
+    if (field === 'itemQty' || field === 'rate' || field === 'gst') {
+      const qty = field === 'itemQty' ? value : updatedRows[index].itemQty;
+      const rate = field === 'rate' ? value : updatedRows[index].rate;
+      const gstPercentage = field === 'gst' ? value : updatedRows[index].gst;
+
+      const amount = (Number(qty) || 0) * (Number(rate) || 0);
+      updatedRows[index].amount = amount;
+
+      // Check if state is Tamil Nadu
+      if (isTamilNaduState()) {
+        // Calculate SGST and CGST for Tamil Nadu
+        const gstAmount = amount * (Number(gstPercentage || 18) / 100);
+        const halfGST = gstAmount / 2;
+        updatedRows[index].sgst = halfGST.toFixed(2);
+        updatedRows[index].cgst = halfGST.toFixed(2);
+        updatedRows[index].igst = ''; // Clear IGST
+      } else {
+        // Calculate IGST for other states
+        const gstAmount = amount * (Number(gstPercentage || 18) / 100);
+        updatedRows[index].sgst = '';
+        updatedRows[index].cgst = '';
+        updatedRows[index].igst = gstAmount.toFixed(2);
+      }
     }
-  };
+
+    setOrderData(updatedRows);
+  }
+};
 
   const handleRemoveItem = index => {
     const updatedRows = orderData.filter((_, i) => i !== index);
@@ -1060,51 +1105,55 @@ const Order = ({ onBack }) => {
   }, [database]);
 
   useEffect(() => {
-    const totalQty = orderData.reduce((sum, row) => sum + Number(row.itemQty || 0), 0);
-    const totalAmt = orderData.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+  const totalQty = orderData.reduce((sum, row) => sum + Number(row.itemQty || 0), 0);
+  const totalAmt = orderData.reduce((sum, row) => sum + Number(row.amount || 0), 0);
 
-    // Calculate GST totals based on state
-    const totalSgstAmt = orderData.reduce((sum, row) => sum + Number(row.sgst || 0), 0);
-    const totalCgstAmt = orderData.reduce((sum, row) => sum + Number(row.cgst || 0), 0);
-    const totalIgstAmt = orderData.reduce((sum, row) => sum + Number(row.igst || 0), 0);
+  // Calculate GST totals based on state
+  const totalSgstAmt = orderData.reduce((sum, row) => sum + Number(row.sgst || 0), 0);
+  const totalCgstAmt = orderData.reduce((sum, row) => sum + Number(row.cgst || 0), 0);
+  const totalIgstAmt = orderData.reduce((sum, row) => sum + Number(row.igst || 0), 0);
 
-    const editingRowQty = Number(editingRow.quantity || 0);
-    const editingRowAmount = Number(editingRow.amount || 0);
-    const editingRowSgst = Number(editingRow.sgst || 0);
-    const editingRowCgst = Number(editingRow.cgst || 0);
-    const editingRowIgst = Number(editingRow.igst || 0);
+  const editingRowQty = Number(editingRow.quantity || 0);
+  const editingRowAmount = Number(editingRow.amount || 0);
+  const editingRowSgst = Number(editingRow.sgst || 0);
+  const editingRowCgst = Number(editingRow.cgst || 0);
+  const editingRowIgst = Number(editingRow.igst || 0);
 
-    // Calculate total amount based on state
-    const customerState = isDistributorRoute
-      ? distributorUser?.state || ''
-      : selectedCustomer?.state || '';
-
-    let totalAmountValue;
-
-    if (customerState.toLowerCase() === 'tamil nadu' || customerState.toLowerCase() === 'tn') {
-      // For Tamil Nadu: Amount + SGST + CGST
-      totalAmountValue =
-        totalAmt +
-        editingRowAmount +
-        (totalSgstAmt + editingRowSgst) +
-        (totalCgstAmt + editingRowCgst);
-    } else {
-      // For other states: Amount + IGST
-      totalAmountValue = totalAmt + editingRowAmount + (totalIgstAmt + editingRowIgst);
-    }
+  // Check if state is Tamil Nadu
+  if (isTamilNaduState()) {
+    // For Tamil Nadu: Amount + SGST + CGST
+    const totalAmountValue =
+      totalAmt +
+      editingRowAmount +
+      (totalSgstAmt + editingRowSgst) +
+      (totalCgstAmt + editingRowCgst);
 
     setTotals({
       qty: totalQty + editingRowQty,
       amount: totalAmt + editingRowAmount,
       sgstAmt: totalSgstAmt + editingRowSgst,
       cgstAmt: totalCgstAmt + editingRowCgst,
-      igstAmt: totalIgstAmt + editingRowIgst,
-      netAmt: 0, // Add calculation if needed
-      grossAmt: 0, // Add calculation if needed
+      igstAmt: 0, // IGST should be 0 for Tamil Nadu
+      netAmt: 0,
+      grossAmt: 0,
       totalAmount: totalAmountValue,
     });
-  }, [orderData, editingRow, selectedCustomer, isDistributorRoute, distributorUser]);
+  } else {
+    // For other states: Amount + IGST
+    const totalAmountValue = totalAmt + editingRowAmount + (totalIgstAmt + editingRowIgst);
 
+    setTotals({
+      qty: totalQty + editingRowQty,
+      amount: totalAmt + editingRowAmount,
+      sgstAmt: 0, // SGST should be 0 for other states
+      cgstAmt: 0, // CGST should be 0 for other states
+      igstAmt: totalIgstAmt + editingRowIgst,
+      netAmt: 0,
+      grossAmt: 0,
+      totalAmount: totalAmountValue,
+    });
+  }
+}, [orderData, editingRow, selectedCustomer, isDistributorRoute, distributorUser]);
 
   const formatCurrency = value => {
     return new Intl.NumberFormat('en-IN', {

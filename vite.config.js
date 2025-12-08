@@ -10,7 +10,7 @@ export default defineConfig({
   ],
 
   build: {
-    chunkSizeWarningLimit: 1000, // optional
+    chunkSizeWarningLimit: 1000,
   },
 
   server: {
