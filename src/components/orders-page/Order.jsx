@@ -17,10 +17,17 @@ const Order = ({ onBack }) => {
   const [orderData, setOrderData] = useState([]);
   const [remarks, setRemarks] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [formResetKey, setFormResetKey] = useState(0);
+  // Add this state near your other state declarations
+  const [focusedRateFields, setFocusedRateFields] = useState({
+    // Store focus state for each row
+    editingRow: false,
+    existingRows: {}, // key: rowIndex, value: boolean
+  });
   const customerSelectRef = useRef(null);
   const isSubmitttingRef = useRef(false);
   const navigate = useNavigate();
-
+  const [showRowValueRows, setShowRowValueRows] = useState(true);
   // Refs for keyboard navigation - separate arrays for each row type
   const inputRefs = useRef([]);
   const selectRefs = useRef([]);
@@ -28,6 +35,7 @@ const Order = ({ onBack }) => {
   const editingRowInputRefs = useRef({});
   const editingRowSelectRef = useRef(null);
   const addButtonRef = useRef(null);
+  const isResettingRef = useRef(false);
 
   const { distributorUser } = useAuth();
 
@@ -53,20 +61,11 @@ const Order = ({ onBack }) => {
   const totalCols = 15; // Total number of editable columns (excluding S.No and Action)
   const actionColumnIndex = 14; // Action column index
 
-  // const formatDate = dateString => {
-  //   if (!dateString) return '';
-  //   const date = new Date(dateString);
-  //   const day = String(date.getDate()).padStart(2, '0');
-  //   const month = String(date.getMonth() + 1).padStart(2, '0');
-  //   const year = date.getFullYear();
-  //   return `${day}-${month}-${year}`;
-  // };
-
   useEffect(() => {
-  console.log('Selected Customer:', selectedCustomer);
-  console.log('Distributor User:', distributorUser);
-  console.log('Is Tamil Nadu State:', isTamilNaduState());
-}, [selectedCustomer, distributorUser]);
+    console.log('Selected Customer:', selectedCustomer);
+    console.log('Distributor User:', distributorUser);
+    console.log('Is Tamil Nadu State:', isTamilNaduState());
+  }, [selectedCustomer, distributorUser]);
 
   useEffect(() => {
     const handleKeyDown = e => {
@@ -184,7 +183,7 @@ const Order = ({ onBack }) => {
         const customerWithState = response.data.map(customer => ({
           ...customer,
           state: customer.state || '',
-        }))
+        }));
         setCustomerOptions(customerWithState);
       } catch (error) {
         console.error('Error fetching customers:', error);
@@ -194,23 +193,67 @@ const Order = ({ onBack }) => {
   }, []);
 
   const handleItemSelect = (selected, index) => {
-  if (index === undefined) {
-    // For editing row
-    setEditingRow(prev => {
-      const updated = {
-        ...prev,
-        item: selected,
-        rate: selected?.rate || '',
-        hsn: selected?.hsn_code || selected?.hsn || '',
-        gst: selected?.gst || '18',
-        sgst: '', // Will calculate based on state
-        cgst: '', // Will calculate based on state
-        igst: '', // Will calculate based on state
-      };
+    if (index === undefined) {
+      // For editing row
+      setEditingRow(prev => {
+        const updated = {
+          ...prev,
+          item: selected,
+          rate: selected?.rate || '',
+          hsn: selected?.hsn_code || selected?.hsn || '',
+          gst: selected?.gst || '18',
+          sgst: '', // Will calculate based on state
+          cgst: '', // Will calculate based on state
+          igst: '', // Will calculate based on state
+        };
 
-      if (prev.quantity && selected?.rate) {
-        const amount = (Number(prev.quantity) || 0) * (Number(selected.rate) || 0);
-        updated.amount = amount;
+        if (prev.quantity && selected?.rate) {
+          const amount = (Number(prev.quantity) || 0) * (Number(selected.rate) || 0);
+          updated.amount = amount;
+
+          // Check if state is Tamil Nadu
+          if (isTamilNaduState()) {
+            // Calculate SGST and CGST for Tamil Nadu
+            const gstPercentage = Number(selected?.gst || 18);
+            const gstAmount = amount * (gstPercentage / 100);
+            const halfGST = gstAmount / 2;
+            updated.sgst = halfGST.toFixed(2);
+            updated.cgst = halfGST.toFixed(2);
+            updated.igst = 0; // Clear IGST
+          } else {
+            // Calculate IGST for other states
+            const gstPercentage = Number(selected?.gst || 18);
+            const gstAmount = amount * (gstPercentage / 100);
+            updated.sgst = ''; // Clear SGST
+            updated.cgst = ''; // Clear CGST
+            updated.igst = gstAmount.toFixed(2);
+          }
+        }
+
+        return updated;
+      });
+
+      // After selecting item, focus on quantity field
+      setTimeout(() => {
+        editingRowInputRefs.current.quantity?.focus();
+      }, 100);
+    } else {
+      // For existing rows
+      const updatedRows = [...orderData];
+      updatedRows[index].item = selected;
+      updatedRows[index].itemCode = selected?.item_code || '';
+      updatedRows[index].itemName = selected?.stock_item_name || '';
+      updatedRows[index].rate = selected?.rate || '';
+      updatedRows[index].hsn = selected?.hsn_code || selected?.hsn || '';
+      updatedRows[index].gst = selected?.gst || '18';
+      updatedRows[index].sgst = '';
+      updatedRows[index].cgst = '';
+      updatedRows[index].igst = '';
+      updatedRows[index].uom = selected?.uom || "No's";
+
+      if (updatedRows[index].itemQty && selected?.rate) {
+        const amount = (Number(updatedRows[index].itemQty) || 0) * (Number(selected.rate) || 0);
+        updatedRows[index].amount = amount;
 
         // Check if state is Tamil Nadu
         if (isTamilNaduState()) {
@@ -218,309 +261,429 @@ const Order = ({ onBack }) => {
           const gstPercentage = Number(selected?.gst || 18);
           const gstAmount = amount * (gstPercentage / 100);
           const halfGST = gstAmount / 2;
-          updated.sgst = halfGST.toFixed(2);
-          updated.cgst = halfGST.toFixed(2);
-          updated.igst = ''; // Clear IGST
+          updatedRows[index].sgst = halfGST.toFixed(2);
+          updatedRows[index].cgst = halfGST.toFixed(2);
+          updatedRows[index].igst = 0; // Clear IGST
         } else {
           // Calculate IGST for other states
           const gstPercentage = Number(selected?.gst || 18);
           const gstAmount = amount * (gstPercentage / 100);
-          updated.sgst = ''; // Clear SGST
-          updated.cgst = ''; // Clear CGST
-          updated.igst = gstAmount.toFixed(2);
+          updatedRows[index].sgst = ''; // Clear SGST
+          updatedRows[index].cgst = ''; // Clear CGST
+          updatedRows[index].igst = gstAmount.toFixed(2);
         }
       }
 
-      return updated;
-    });
+      setOrderData(updatedRows);
 
-    // After selecting item, focus on quantity field
-    setTimeout(() => {
-      editingRowInputRefs.current.quantity?.focus();
-    }, 100);
-  } else {
-    // For existing rows
-    const updatedRows = [...orderData];
-    updatedRows[index].item = selected;
-    updatedRows[index].itemCode = selected?.item_code || '';
-    updatedRows[index].itemName = selected?.stock_item_name || '';
-    updatedRows[index].rate = selected?.rate || '';
-    updatedRows[index].hsn = selected?.hsn_code || selected?.hsn || '';
-    updatedRows[index].gst = selected?.gst || '18';
-    updatedRows[index].sgst = '';
-    updatedRows[index].cgst = '';
-    updatedRows[index].igst = '';
-    updatedRows[index].uom = selected?.uom || "No's";
-
-    if (updatedRows[index].itemQty && selected?.rate) {
-      const amount = (Number(updatedRows[index].itemQty) || 0) * (Number(selected.rate) || 0);
-      updatedRows[index].amount = amount;
-
-      // Check if state is Tamil Nadu
-      if (isTamilNaduState()) {
-        // Calculate SGST and CGST for Tamil Nadu
-        const gstPercentage = Number(selected?.gst || 18);
-        const gstAmount = amount * (gstPercentage / 100);
-        const halfGST = gstAmount / 2;
-        updatedRows[index].sgst = halfGST.toFixed(2);
-        updatedRows[index].cgst = halfGST.toFixed(2);
-        updatedRows[index].igst = ''; // Clear IGST
-      } else {
-        // Calculate IGST for other states
-        const gstPercentage = Number(selected?.gst || 18);
-        const gstAmount = amount * (gstPercentage / 100);
-        updatedRows[index].sgst = ''; // Clear SGST
-        updatedRows[index].cgst = ''; // Clear CGST
-        updatedRows[index].igst = gstAmount.toFixed(2);
-      }
+      // After selecting item, focus on quantity field
+      setTimeout(() => {
+        const quantityIndex = index * totalCols + 3;
+        inputRefs.current[quantityIndex]?.focus();
+      }, 100);
     }
-
-    setOrderData(updatedRows);
-
-    // After selecting item, focus on quantity field
-    setTimeout(() => {
-      const quantityIndex = index * totalCols + 3;
-      inputRefs.current[quantityIndex]?.focus();
-    }, 100);
-  }
-};
-
-  const handleCustomerSelect = selected => {
-  setCustomerName(selected);
-  setSelectedCustomer(selected);
-
-  // Recalculate GST for all items when customer changes
-  recalculateGSTForAllItems(selected?.state || '');
-};
-
-// Helper function to recalculate GST for all items
-const recalculateGSTForAllItems = (customerState) => {
-  const isTN = customerState.toLowerCase().trim() === 'tamil nadu' || 
-               customerState.toLowerCase().trim() === 'tn' ||
-               customerState.toLowerCase().trim() === 'tamilnadu';
-
-  // Update editing row
-  setEditingRow(prev => {
-    if (prev.item && prev.quantity && prev.rate) {
-      const amount = (Number(prev.quantity) || 0) * (Number(prev.rate) || 0);
-      const gstPercentage = Number(prev.gst || 18);
-      const gstAmount = amount * (gstPercentage / 100);
-      
-      let updated = { ...prev, amount };
-      
-      if (isTN) {
-        const halfGST = gstAmount / 2;
-        updated.sgst = halfGST.toFixed(2);
-        updated.cgst = halfGST.toFixed(2);
-        updated.igst = '';
-      } else {
-        updated.sgst = '';
-        updated.cgst = '';
-        updated.igst = gstAmount.toFixed(2);
-      }
-      
-      return updated;
-    }
-    return prev;
-  });
-  
-  // Update existing rows
-  if (orderData.length > 0) {
-    const updatedRows = orderData.map(row => {
-      if (row.itemQty && row.rate) {
-        const amount = (Number(row.itemQty) || 0) * (Number(row.rate) || 0);
-        const gstPercentage = Number(row.gst || 18);
-        const gstAmount = amount * (gstPercentage / 100);
-        
-        let updatedRow = { ...row, amount };
-        
-        if (isTN) {
-          const halfGST = gstAmount / 2;
-          updatedRow.sgst = halfGST.toFixed(2);
-          updatedRow.cgst = halfGST.toFixed(2);
-          updatedRow.igst = '';
-        } else {
-          updatedRow.sgst = '';
-          updatedRow.cgst = '';
-          updatedRow.igst = gstAmount.toFixed(2);
-        }
-        
-        return updatedRow;
-      }
-      return row;
-    });
-    
-    setOrderData(updatedRows);
-  }
-};
-
-// Add this validation in your form
-useEffect(() => {
-  if (isDistributorRoute) {
-    if (!distributorUser?.state) {
-      console.warn('Distributor user state is not set. Defaulting to IGST calculation.');
-    }
-  } else {
-    if (customerName && !selectedCustomer?.state) {
-      console.warn('Customer state is not available. Defaulting to IGST calculation.');
-    }
-  }
-}, [distributorUser, customerName, selectedCustomer, isDistributorRoute]);
-
-// When distributor user changes, update GST calculations
-useEffect(() => {
-  if (isDistributorRoute && distributorUser) {
-    const distributorState = distributorUser.state || '';
-    recalculateGSTForAllItems(distributorState);
-  }
-}, [distributorUser, isDistributorRoute]);
-
-// When selected customer changes (non-distributor route)
-useEffect(() => {
-  if (!isDistributorRoute && selectedCustomer) {
-    const customerState = selectedCustomer.state || '';
-    recalculateGSTForAllItems(customerState);
-  }
-}, [selectedCustomer, isDistributorRoute]);
-
-// Helper function to check if state is Tamil Nadu
-const isTamilNaduState = () => {
-  let customerState = '';
-  
-  if (isDistributorRoute) {
-    // For distributor route, check distributorUser state
-    customerState = distributorUser?.state || '';
-    console.log('Distributor State:', customerState);
-  } else {
-    // For non-distributor route, check selected customer state
-    customerState = selectedCustomer?.state || '';
-    console.log('Customer State:', customerState);
-  }
-  
-  // Normalize the state string for comparison
-  const normalizedState = customerState.toLowerCase().trim();
-  return normalizedState === 'tamil nadu' || 
-         normalizedState === 'tn' ||
-         normalizedState === 'tamilnadu';
-};
-
-  const handleAddRow = () => {
-    if (!editingRow.item || !editingRow.quantity) {
-      toast.error('Please select item and enter quantity!', {
-        position: 'bottom-right',
-        autoClose: 3000,
-      });
-      return;
-    }
-
-    const newRow = {
-      item: editingRow.item,
-      itemCode: editingRow.item.item_code,
-      itemName: editingRow.item.stock_item_name,
-      hsn: editingRow.hsn,
-      gst: editingRow.gst,
-      sgst: editingRow.sgst,
-      cgst: editingRow.cgst,
-      igst: editingRow.igst,
-      delivery_date: editingRow.delivery_date,
-      delivery_mode: editingRow.delivery_mode,
-      itemQty: Number(editingRow.quantity),
-      uom: editingRow.item.uom || "No's",
-      rate: Number(editingRow.rate),
-      amount: Number(editingRow.rate) * Number(editingRow.quantity),
-      netRate: Number(editingRow.rate),
-      grossAmount: Number(editingRow.rate) * Number(editingRow.quantity),
-    };
-
-    setOrderData(prev => [...prev, newRow]);
-
-    // Reset editing row but keep customer state logic in mind
-    setEditingRow({
-      item: null,
-      delivery_date: '',
-      delivery_mode: '',
-      quantity: '',
-      rate: '',
-      amount: '',
-      hsn: '',
-      gst: '',
-      sgst: '',
-      cgst: '',
-      igst: '',
-    });
-
-    // Focus on the new editing row's select
-    setTimeout(() => {
-      editingRowSelectRef.current?.focus();
-    }, 100);
   };
 
-  const handleFieldChange = (field, value, index) => {
-  if (index === undefined) {
-    // For editing row
+  const handleCustomerSelect = selected => {
+    setCustomerName(selected);
+    setSelectedCustomer(selected);
+
+    // Recalculate GST for all items when customer changes
+    recalculateGSTForAllItems(selected?.state || '');
+  };
+
+  // Helper function to recalculate GST for all items
+  const recalculateGSTForAllItems = customerState => {
+    const isTN =
+      customerState.toLowerCase().trim() === 'tamil nadu' ||
+      customerState.toLowerCase().trim() === 'tn' ||
+      customerState.toLowerCase().trim() === 'tamilnadu';
+
+    // Update editing row
     setEditingRow(prev => {
-      const updated = { ...prev, [field]: value };
+      if (prev.item && prev.quantity && prev.rate) {
+        const amount = (Number(prev.quantity) || 0) * (Number(prev.rate) || 0);
+        const gstPercentage = Number(prev.gst || 18);
+        const gstAmount = amount * (gstPercentage / 100);
 
-      if (field === 'quantity' || field === 'rate' || field === 'gst') {
-        const qty = field === 'quantity' ? value : prev.quantity;
-        const rate = field === 'rate' ? value : prev.rate;
-        const gstPercentage = field === 'gst' ? value : prev.gst;
+        let updated = { ...prev, amount };
 
-        const amount = (Number(qty) || 0) * (Number(rate) || 0);
-        updated.amount = amount;
-
-        // Check if state is Tamil Nadu
-        if (isTamilNaduState()) {
-          // Calculate SGST and CGST for Tamil Nadu
-          const gstAmount = amount * (Number(gstPercentage || 18) / 100);
+        if (isTN) {
           const halfGST = gstAmount / 2;
           updated.sgst = halfGST.toFixed(2);
           updated.cgst = halfGST.toFixed(2);
-          updated.igst = ''; // Clear IGST
+          updated.igst = 0;
         } else {
-          // Calculate IGST for other states
-          const gstAmount = amount * (Number(gstPercentage || 18) / 100);
           updated.sgst = '';
           updated.cgst = '';
           updated.igst = gstAmount.toFixed(2);
         }
+
+        return updated;
       }
-
-      return updated;
+      return prev;
     });
-  } else {
-    // For existing rows
-    const updatedRows = [...orderData];
-    updatedRows[index][field] = value;
 
-    if (field === 'itemQty' || field === 'rate' || field === 'gst') {
-      const qty = field === 'itemQty' ? value : updatedRows[index].itemQty;
-      const rate = field === 'rate' ? value : updatedRows[index].rate;
-      const gstPercentage = field === 'gst' ? value : updatedRows[index].gst;
+    // Update existing rows
+    if (orderData.length > 0) {
+      const updatedRows = orderData.map(row => {
+        if (row.itemQty && row.rate) {
+          const amount = (Number(row.itemQty) || 0) * (Number(row.rate) || 0);
+          const gstPercentage = Number(row.gst || 18);
+          const gstAmount = amount * (gstPercentage / 100);
 
-      const amount = (Number(qty) || 0) * (Number(rate) || 0);
-      updatedRows[index].amount = amount;
+          let updatedRow = { ...row, amount };
 
-      // Check if state is Tamil Nadu
-      if (isTamilNaduState()) {
-        // Calculate SGST and CGST for Tamil Nadu
-        const gstAmount = amount * (Number(gstPercentage || 18) / 100);
-        const halfGST = gstAmount / 2;
-        updatedRows[index].sgst = halfGST.toFixed(2);
-        updatedRows[index].cgst = halfGST.toFixed(2);
-        updatedRows[index].igst = ''; // Clear IGST
-      } else {
-        // Calculate IGST for other states
-        const gstAmount = amount * (Number(gstPercentage || 18) / 100);
-        updatedRows[index].sgst = '';
-        updatedRows[index].cgst = '';
-        updatedRows[index].igst = gstAmount.toFixed(2);
+          if (isTN) {
+            const halfGST = gstAmount / 2;
+            updatedRow.sgst = halfGST.toFixed(2);
+            updatedRow.cgst = halfGST.toFixed(2);
+            updatedRow.igst = 0;
+          } else {
+            updatedRow.sgst = '';
+            updatedRow.cgst = '';
+            updatedRow.igst = gstAmount.toFixed(2);
+          }
+
+          return updatedRow;
+        }
+        return row;
+      });
+
+      setOrderData(updatedRows);
+    }
+  };
+
+  // Add this validation in your form
+  useEffect(() => {
+    if (isDistributorRoute) {
+      if (!distributorUser?.state) {
+        console.warn('Distributor user state is not set. Defaulting to IGST calculation.');
+      }
+    } else {
+      if (customerName && !selectedCustomer?.state) {
+        console.warn('Customer state is not available. Defaulting to IGST calculation.');
       }
     }
+  }, [distributorUser, customerName, selectedCustomer, isDistributorRoute]);
 
-    setOrderData(updatedRows);
+  // When distributor user changes, update GST calculations
+  useEffect(() => {
+    if (isDistributorRoute && distributorUser) {
+      const distributorState = distributorUser.state || '';
+      recalculateGSTForAllItems(distributorState);
+    }
+  }, [distributorUser, isDistributorRoute]);
+
+  // When selected customer changes (non-distributor route)
+  useEffect(() => {
+    if (!isDistributorRoute && selectedCustomer) {
+      const customerState = selectedCustomer.state || '';
+      recalculateGSTForAllItems(customerState);
+    }
+  }, [selectedCustomer, isDistributorRoute]);
+
+  // Helper function to check if state is Tamil Nadu
+  const isTamilNaduState = () => {
+    let customerState = '';
+
+    if (isDistributorRoute) {
+      // For distributor route, check distributorUser state
+      customerState = distributorUser?.state || '';
+      console.log('Distributor State:', customerState);
+    } else {
+      // For non-distributor route, check selected customer state
+      customerState = selectedCustomer?.state || '';
+      console.log('Customer State:', customerState);
+    }
+
+    // Normalize the state string for comparison
+    const normalizedState = customerState.toLowerCase().trim();
+    return (
+      normalizedState === 'tamil nadu' ||
+      normalizedState === 'tn' ||
+      normalizedState === 'tamilnadu'
+    );
+  };
+
+  const handleAddRow = () => {
+  // Validation
+  if (!editingRow.item) {
+    toast.error('Please select item!', {
+      position: 'bottom-right',
+      autoClose: 3000,
+    });
+    return;
   }
+
+  if (!editingRow.quantity || editingRow.quantity.trim() === '') {
+    toast.error('Please enter quantity!', {
+      position: 'bottom-right',
+      autoClose: 3000,
+    });
+    // Focus on quantity field
+    setTimeout(() => {
+      editingRowInputRefs.current.quantity?.focus();
+    }, 100);
+    return;
+  }
+
+  // Convert quantity to number for validation
+  const quantityNum = parseFloat(editingRow.quantity);
+  if (isNaN(quantityNum) || quantityNum <= 0) {
+    toast.error('Please enter a valid quantity (greater than 0)!', {
+      position: 'bottom-right',
+      autoClose: 3000,
+    });
+    // Focus on quantity field
+    setTimeout(() => {
+      editingRowInputRefs.current.quantity?.focus();
+    }, 100);
+    return;
+  }
+
+  if (!editingRow.delivery_date || editingRow.delivery_date.trim() === '') {
+    toast.error('Please enter delivery date!', {
+      position: 'bottom-right',
+      autoClose: 3000,
+    });
+    // Focus on delivery date field
+    setTimeout(() => {
+      editingRowInputRefs.current.delivery_date?.focus();
+    }, 100);
+    return;
+  }
+
+  if (!editingRow.delivery_mode || editingRow.delivery_mode.trim() === '') {
+    toast.error('Please enter delivery mode!', {
+      position: 'bottom-right',
+      autoClose: 3000,
+    });
+    // Focus on delivery mode field
+    setTimeout(() => {
+      editingRowInputRefs.current.delivery_mode?.focus();
+    }, 100);
+    return;
+  }
+
+  // Ensure rate is a number
+  const rateValue = parseFloat(editingRow.rate) || 0;
+  
+  const newRow = {
+    item: editingRow.item,
+    itemCode: editingRow.item.item_code,
+    itemName: editingRow.item.stock_item_name,
+    hsn: editingRow.hsn,
+    gst: editingRow.gst,
+    sgst: editingRow.sgst,
+    cgst: editingRow.cgst,
+    igst: editingRow.igst,
+    delivery_date: editingRow.delivery_date,
+    delivery_mode: editingRow.delivery_mode,
+    itemQty: quantityNum, // Use the parsed number
+    uom: editingRow.item.uom || "No's",
+    rate: rateValue,
+    amount: rateValue * quantityNum,
+    netRate: rateValue,
+    grossAmount: rateValue * quantityNum,
+  };
+
+  setOrderData(prev => [...prev, newRow]);
+
+  // Reset editing row
+  setEditingRow({
+    item: null,
+    delivery_date: '',
+    delivery_mode: '',
+    quantity: '',
+    rate: '',
+    amount: '',
+    hsn: '',
+    gst: '',
+    sgst: '',
+    cgst: '',
+    igst: '',
+  });
+
+  // Focus on the new editing row's select
+  setTimeout(() => {
+    editingRowSelectRef.current?.focus();
+  }, 100);
 };
+
+  const handleFieldChange = (field, value, index) => {
+    if (index === undefined) {
+      // For editing row
+      setEditingRow(prev => {
+        const updated = { ...prev, [field]: value };
+
+        if (field === 'quantity' || field === 'rate' || field === 'gst') {
+          const qty = field === 'quantity' ? value : prev.quantity;
+          const rate = field === 'rate' ? value : prev.rate;
+          const gstPercentage = field === 'gst' ? value : prev.gst;
+
+          // Parse rate value for calculation
+          const rateNum = field === 'rate' ? parseFloat(value) || 0 : parseFloat(prev.rate) || 0;
+          const amount = (parseFloat(qty) || 0) * rateNum;
+          updated.amount = amount;
+
+          // Check if state is Tamil Nadu
+          if (isTamilNaduState()) {
+            // Calculate SGST and CGST for Tamil Nadu
+            const gstAmount = amount * (parseFloat(gstPercentage || 18) / 100);
+            const halfGST = gstAmount / 2;
+            updated.sgst = halfGST.toFixed(2);
+            updated.cgst = halfGST.toFixed(2);
+            updated.igst = ''; // Clear IGST
+          } else {
+            // Calculate IGST for other states
+            const gstAmount = amount * (Number(gstPercentage || 18) / 100);
+            updated.sgst = '';
+            updated.cgst = '';
+            updated.igst = gstAmount.toFixed(2);
+          }
+        }
+
+        return updated;
+      });
+    } else {
+      // For existing rows
+      const updatedRows = [...orderData];
+
+      // If it's the rate field, store the raw value but keep numeric value for calculations
+      if (field === 'rate') {
+        updatedRows[index][field] = value; // Store the raw input
+      } else {
+        updatedRows[index][field] = value;
+      }
+
+      if (field === 'itemQty' || field === 'rate' || field === 'gst') {
+        const qty = field === 'itemQty' ? value : updatedRows[index].itemQty;
+        const rate = field === 'rate' ? value : updatedRows[index].rate;
+        const gstPercentage = field === 'gst' ? value : updatedRows[index].gst;
+
+        // Parse rate for calculation
+        const rateNum = parseFloat(rate) || 0;
+        const amount = (parseFloat(qty) || 0) * rateNum;
+        updatedRows[index].amount = amount;
+
+        // Check if state is Tamil Nadu
+        if (isTamilNaduState()) {
+          // Calculate SGST and CGST for Tamil Nadu
+          const gstAmount = amount * (parseFloat(gstPercentage || 18) / 100);
+          const halfGST = gstAmount / 2;
+          updatedRows[index].sgst = halfGST.toFixed(2);
+          updatedRows[index].cgst = halfGST.toFixed(2);
+          updatedRows[index].igst = 0; // Clear IGST
+        } else {
+          // Calculate IGST for other states
+          const gstAmount = amount * (parseFloat(gstPercentage || 18) / 100);
+          updatedRows[index].sgst = '';
+          updatedRows[index].cgst = '';
+          updatedRows[index].igst = gstAmount.toFixed(2);
+        }
+      }
+
+      setOrderData(updatedRows);
+    }
+  };
+
+  // Add this function to handle rate field blur (when focus leaves)
+  const handleRateBlur = index => {
+    if (index === undefined) {
+      // For editing row
+      setFocusedRateFields(prev => ({
+        ...prev,
+        editingRow: false,
+      }));
+
+      setEditingRow(prev => {
+        if (!prev.rate) return { ...prev, rate: '' };
+
+        // Parse the value to ensure it's a number
+        const rateValue = parseFloat(prev.rate);
+        if (isNaN(rateValue)) return { ...prev, rate: '' };
+
+        // Return numeric value, not formatted string
+        return { ...prev, rate: rateValue.toFixed(2) };
+      });
+    } else {
+      // For existing rows
+      setFocusedRateFields(prev => ({
+        ...prev,
+        existingRows: {
+          ...prev.existingRows,
+          [index]: false,
+        },
+      }));
+
+      setOrderData(prev => {
+        const updatedRows = [...prev];
+        if (!updatedRows[index].rate) {
+          updatedRows[index].rate = '';
+          return updatedRows;
+        }
+
+        const rateValue = parseFloat(updatedRows[index].rate);
+        if (isNaN(rateValue)) {
+          updatedRows[index].rate = '';
+        } else {
+          // Store as numeric string with 2 decimal places
+          updatedRows[index].rate = rateValue.toFixed(2);
+        }
+
+        return updatedRows;
+      });
+    }
+  };
+
+  // Add this function to handle rate field focus
+  const handleRateFocus = index => {
+    if (index === undefined) {
+      // For editing row
+      setFocusedRateFields(prev => ({
+        ...prev,
+        editingRow: true,
+      }));
+    } else {
+      // For existing rows
+      setFocusedRateFields(prev => ({
+        ...prev,
+        existingRows: {
+          ...prev.existingRows,
+          [index]: true,
+        },
+      }));
+    }
+  };
+
+  // Helper function to get display value for existing rows rate
+  const getExistingRowRateDisplay = (rowIndex, rateValue) => {
+    if (focusedRateFields.existingRows[rowIndex]) {
+      // When focused, show raw value
+      return rateValue || '';
+    } else {
+      // When not focused, show formatted value
+      if (rateValue && !isNaN(parseFloat(rateValue))) {
+        return formatCurrency(parseFloat(rateValue));
+      }
+      return '';
+    }
+  };
+
+  // Helper function to get display value for editing row rate
+  const getEditingRowRateDisplay = rateValue => {
+    if (focusedRateFields.editingRow) {
+      // When focused, show raw value
+      return rateValue || '';
+    } else {
+      // When not focused, show formatted value
+      if (rateValue && !isNaN(parseFloat(rateValue))) {
+        return formatCurrency(parseFloat(rateValue));
+      }
+      return '';
+    }
+  };
 
   const handleRemoveItem = index => {
     const updatedRows = orderData.filter((_, i) => i !== index);
@@ -557,16 +720,128 @@ const isTamilNaduState = () => {
     });
   };
 
-  // Enhanced keyboard navigation handler
+  // Function to normalize different date formats to YYYY-MM-DD
+  const normalizeDateString = dateStr => {
+    if (!dateStr || typeof dateStr !== 'string') return '';
+
+    // Remove any whitespace and replace common separators with hyphens
+    const cleanedStr = dateStr.trim().replace(/[./]/g, '-');
+
+    // Try to parse the date - multiple format attempts
+    let date = null;
+
+    // Try parsing as DD-MM-YYYY (most common for your input)
+    const parts = cleanedStr.split('-');
+    if (parts.length === 3) {
+      const day = parts[0];
+      const month = parts[1];
+      const year = parts[2];
+
+      // Check if it's likely DD-MM-YYYY (day <= 31, month <= 12)
+      if (day.length <= 2 && month.length <= 2 && year.length === 4) {
+        // Use the constructor with individual parts to avoid timezone issues
+        date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+      }
+      // Check if it's YYYY-MM-DD
+      else if (year.length === 4 && month.length <= 2 && day.length <= 2) {
+        date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+      }
+    }
+
+    // If parsing failed, try the Date constructor directly
+    if (!date || isNaN(date.getTime())) {
+      date = new Date(cleanedStr);
+    }
+
+    // Validate the date
+    if (!date || isNaN(date.getTime())) {
+      return ''; // Invalid date
+    }
+
+    // Format as YYYY-MM-DD for consistency
+    const yearFormatted = date.getFullYear();
+    const monthFormatted = String(date.getMonth() + 1).padStart(2, '0');
+    const dayFormatted = String(date.getDate()).padStart(2, '0');
+
+    return `${yearFormatted}-${monthFormatted}-${dayFormatted}`;
+  };
+
+  // Function to validate if a date is today or in the future
+  const validateFutureDate = dateStr => {
+    if (!dateStr) return false;
+
+    const normalizedDate = normalizeDateString(dateStr);
+    if (!normalizedDate) return false;
+
+    const inputDate = new Date(normalizedDate);
+    const today = new Date();
+
+    // Set both dates to start of day for accurate comparison
+    const inputDateStart = new Date(
+      inputDate.getFullYear(),
+      inputDate.getMonth(),
+      inputDate.getDate(),
+    );
+    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+    // Date must be >= today
+    return inputDateStart >= todayStart;
+  };
+
+  // Enhanced keyboard navigation handler with validation
   const handleKeyDownTable = (e, rowIndex, colIndex, fieldType = 'input') => {
     const key = e.key;
-
     // Calculate total rows including editing row
     const totalRows = orderData.length + 1; // +1 for editing row
-    // const isEditingRow = rowIndex === totalRows - 1;
 
-    if (key === 'Enter' || key === 'Tab') {
-      e.preventDefault();
+    // Common function for moving to next cell (used by Enter, Tab, ArrowRight)
+    const moveToNextCell = () => {
+      // Get current row data
+      const currentRowData = rowIndex === totalRows - 1 ? editingRow : orderData[rowIndex];
+      // Check validation based on current column
+      let shouldPreventNavigation = false;
+
+      if (colIndex === 3) {
+        // Quantity column
+        // if (!currentRowData.quantity || currentRowData.quantity.trim() === '') {
+        //   shouldPreventNavigation = true;
+        //   toast.error('Please enter quantity before proceeding!', {
+        //     position: 'bottom-right',
+        //     autoClose: 3000,
+        //   });
+        // }
+      } else if (colIndex === 12) {
+        // Delivery Date column
+        const dateStr = currentRowData.delivery_date || '';
+
+        if (!dateStr.trim()) {
+          shouldPreventNavigation = true;
+          toast.error('Please enter delivery date before proceeding!', {
+            position: 'bottom-right',
+            autoClose: 3000,
+          });
+        } else if (!validateFutureDate(dateStr)) {
+          shouldPreventNavigation = true;
+          toast.error('Delivery date must be today or a future date!', {
+            position: 'bottom-right',
+            autoClose: 3000,
+          });
+        }
+      } else if (colIndex === 13) {
+        // Delivery Mode column
+        if (!currentRowData.delivery_mode || currentRowData.delivery_mode.trim() === '') {
+          shouldPreventNavigation = true;
+          toast.error('Please enter delivery mode before proceeding!', {
+            position: 'bottom-right',
+            autoClose: 3000,
+          });
+        }
+      }
+
+      if (shouldPreventNavigation) {
+        e.preventDefault();
+        return;
+      }
 
       let nextRow = rowIndex;
       let nextCol = colIndex + 1;
@@ -637,11 +912,10 @@ const isTamilNaduState = () => {
           }
         }
       }, 0);
-    } else if (key === 'ArrowRight') {
-      e.preventDefault();
-      handleKeyDownTable({ key: 'Enter' }, rowIndex, colIndex, fieldType);
-    } else if (key === 'ArrowLeft') {
-      e.preventDefault();
+    };
+
+    // Common function for moving to previous cell (used by ArrowLeft, Backspace)
+    const moveToPrevCell = () => {
       let prevRow = rowIndex;
       let prevCol = colIndex - 1;
 
@@ -685,15 +959,63 @@ const isTamilNaduState = () => {
               selectRefs.current[prevRow * totalCols + prevCol]?.focus();
             } else if (prevCol === actionColumnIndex) {
               // Skip delete button, move to previous column
-              handleKeyDownTable({ key: 'ArrowLeft' }, prevRow, prevCol);
+              handleKeyDownTable({ key: 'Backspace' }, prevRow, prevCol);
             } else {
               inputRefs.current[prevRow * totalCols + prevCol]?.focus();
             }
           }
         }, 0);
       }
+    };
+
+    if (key === 'Enter' || key === 'Tab') {
+      e.preventDefault();
+      moveToNextCell();
+    } else if (key === 'ArrowRight') {
+      e.preventDefault();
+      moveToNextCell();
+    } else if (key === 'ArrowLeft' || key === 'Backspace') {
+      e.preventDefault();
+      moveToPrevCell();
     } else if (key === 'ArrowDown') {
       e.preventDefault();
+      // Check validation before moving down
+      const currentRowData = rowIndex === totalRows - 1 ? editingRow : orderData[rowIndex];
+      let shouldPreventNavigation = false;
+
+      if (colIndex === 3) {
+        // Quantity column
+        // if (!currentRowData.quantity || currentRowData.quantity.trim() === '') {
+        //   shouldPreventNavigation = true;
+        //   toast.error('Please enter quantity before proceeding!', {
+        //     position: 'bottom-right',
+        //     autoClose: 3000,
+        //   });
+        // }
+      } else if (colIndex === 12) {
+        // Delivery Date column
+        if (!currentRowData.delivery_date || currentRowData.delivery_date.trim() === '') {
+          shouldPreventNavigation = true;
+          toast.error('Please enter delivery date before proceeding!', {
+            position: 'bottom-right',
+            autoClose: 3000,
+          });
+        }
+      } else if (colIndex === 13) {
+        // Delivery Mode column
+        if (!currentRowData.delivery_mode || currentRowData.delivery_mode.trim() === '') {
+          shouldPreventNavigation = true;
+          toast.error('Please enter delivery mode before proceeding!', {
+            position: 'bottom-right',
+            autoClose: 3000,
+          });
+        }
+      }
+
+      if (shouldPreventNavigation) {
+        return;
+      }
+
       let nextRow = rowIndex + 1;
       if (nextRow < totalRows) {
         setTimeout(() => {
@@ -869,57 +1191,32 @@ const isTamilNaduState = () => {
     }
   }, [orderData.length, editingRow.item]);
 
-  const postOrder = async () => {
-    if (isSubmitttingRef.current) return;
-    isSubmitttingRef.current = true;
+  const postOrder = async payload => {
+  if (isSubmitttingRef.current) return;
+  isSubmitttingRef.current = true;
 
-    try {
-      const result = await api.post('/orders', database);
-      console.log(result);
+  try {
+    if (!payload.length) return;
 
-      const nextOrderNumber = generateOrderNumber();
-      saveOrderNumber(nextOrderNumber);
-      setOrderNumber(nextOrderNumber);
+    console.log('Sending data:', payload);
+    await api.post('/orders', payload);
 
-      setOrderData([]);
-      setDatebase([]);
-      setRemarks('');
+    toast.success('Order placed successfully!', {
+      position: 'bottom-right',
+      autoClose: 3000,
+    });
 
-      setEditingRow({
-        item: null,
-        delivery_date: '',
-        delivery_mode: '',
-        quantity: '',
-        rate: '',
-        amount: '',
-        hsn: '',
-        gst: '',
-        sgst: '',
-        cgst: '',
-        igst: '',
-      });
-
-      if (!isDistributorRoute) {
-        setCustomerName(null);
-        if (customerSelectRef.current) {
-          customerSelectRef.current.clearValue();
-        }
-      }
-
-      toast.success('Order Placed Successfully and waiting for approval!.', {
-        position: 'bottom-right',
-        autoClose: 3000,
-      });
-    } catch (error) {
-      console.error('Error placing order:', error);
-      toast.error('Error placing order. Please try again.', {
-        position: 'bottom-right',
-        autoClose: 3000,
-      });
-    } finally {
-      isSubmitttingRef.current = false;
-    }
-  };
+  } catch (err) {
+    console.error(err);
+    toast.error('Error placing order', {
+      position: 'bottom-right',
+      autoClose: 3000,
+    });
+    throw err;
+  } finally {
+    isSubmitttingRef.current = false;
+  }
+};
 
   const convertToMySQLDate = dateString => {
     if (!dateString) return '';
@@ -941,219 +1238,202 @@ const isTamilNaduState = () => {
     return '';
   };
 
-  const handleSubmit = e => {
-    e.preventDefault();
+  const handleSubmit = async e => {
+  e.preventDefault();
 
-    if (!isDistributorRoute && !customerName) {
-      toast.error('Please select a customer name.', {
-        position: 'bottom-right',
-        autoClose: 3000,
-      });
-      return;
-    }
+  if (!isDistributorRoute && !customerName) {
+    toast.error('Please select a customer name.');
+    return;
+  }
 
-    const hasEditingRowData = editingRow.item && editingRow.quantity;
+  const hasEditingRowData = editingRow.item && editingRow.quantity;
+  if (!orderData.length && !hasEditingRowData) {
+    toast.error('No items in the order.');
+    return;
+  }
 
-    if (orderData.length >= 1 || hasEditingRowData) {
-      const getVoucherType = () => {
-        if (location.pathname.includes('/corporate')) {
-          return 'Direct Order Management';
-        } else if (location.pathname.includes('/distributor')) {
-          return 'Distributor Order-Web Based';
-        } else {
-          return 'Sales Order';
-        }
+  const voucherType = location.pathname.includes('/corporate')
+    ? 'Direct Order Management'
+    : location.pathname.includes('/distributor')
+    ? 'Distributor Order-Web Based'
+    : 'Sales Order';
+
+  const customer = isDistributorRoute
+    ? {
+        customer_code: distributorUser?.customer_code || 'DISTRIBUTOR',
+        customer_name: distributorUser?.customer_name || 'Distributor User',
+      }
+    : {
+        customer_code: customerName?.customer_code || '',
+        customer_name: customerName?.customer_name || '',
       };
 
-      const voucherType = getVoucherType();
-      const customerData = isDistributorRoute
-        ? {
-            customer_code: distributorUser?.customer_code || 'DISTRIBUTOR',
-            customer_name: distributorUser?.customer_name || 'Distributor User',
-          }
-        : {
-            customer_code: customerName?.customer_code || '',
-            customer_name: customerName?.customer_name || '',
-          };
+  const rows = [...orderData];
 
-      const allRows = [...orderData];
-
-      if (hasEditingRowData) {
-        const editingRowData = {
-          item: editingRow.item,
-          itemCode: editingRow.item.item_code,
-          itemName: editingRow.item.stock_item_name,
-          hsn: editingRow.hsn,
-          gst: editingRow.gst,
-          sgst: editingRow.sgst,
-          cgst: editingRow.cgst,
-          igst: editingRow.igst,
-          delivery_date: editingRow.delivery_date,
-          delivery_mode: editingRow.delivery_mode,
-          itemQty: Number(editingRow.quantity),
-          uom: editingRow.item.uom || "No's",
-          rate: Number(editingRow.rate),
-          amount: Number(editingRow.rate) * Number(editingRow.quantity),
-          netRate: Number(editingRow.rate),
-          grossAmount: Number(editingRow.rate) * Number(editingRow.quantity),
-        };
-        allRows.push(editingRowData);
-      }
-
-      const dbd = allRows.map(item => ({
-        voucher_type: voucherType,
-        order_no: orderNumber,
-        date: date,
-        status: 'pending',
-        executiveCode: distributorUser.customer_code || '',
-        executive: distributorUser.customer_name || '',
-        role: distributorUser.role || '',
-        customer_code: customerData.customer_code,
-        customer_name: customerData.customer_name,
-        item_code: item.itemCode,
-        item_name: item.itemName,
-        hsn: item.hsn,
-        gst: Number(String(item.gst).replace('%', '').trim()),
-        sgst: Number(String(item.sgst).replace('%', '').trim()),
-        cgst: Number(String(item.cgst).replace('%', '').trim()),
-        igst: Number(String(item.igst).replace('%', '').trim()),
-        delivery_date: convertToMySQLDate(item.delivery_date),
-        delivery_mode: item.delivery_mode,
-        quantity: item.itemQty,
-        uom: item.uom,
-        rate: item.rate,
-        amount: item.amount,
-        net_rate: item.netRate,
-        gross_amount: item.grossAmount,
-        disc_percentage: 0,
-        disc_amount: 0,
-        spl_disc_percentage: 0,
-        spl_disc_amount: 0,
-        total_quantity: totals.qty + (hasEditingRowData ? Number(editingRow.quantity) : 0),
-        total_amount:
-          totals.amount +
-          (hasEditingRowData ? Number(editingRow.rate) * Number(editingRow.quantity) : 0),
-        remarks: remarks,
-      }));
-
-      setDatebase(prev => [...prev, ...dbd]);
-      console.log('Submitting order data:', dbd);
-
-      const nextOrderNumber = generateOrderNumber();
-      saveOrderNumber(nextOrderNumber);
-      setOrderNumber(nextOrderNumber);
-
-      resetForm();
-    } else {
-      toast.error('No items in the order. Please add items before submitting.', {
-        position: 'bottom-right',
-        autoClose: 3000,
-      });
-    }
-  };
-
-  const resetForm = () => {
-    setOrderData([]);
-    setEditingRow({
-      item: null,
-      delivery_date: '',
-      delivery_mode: '',
-      quantity: '',
-      rate: '',
-      amount: '',
-      hsn: '',
-      gst: '',
-      sgst: '',
-      cgst: '',
-      igst: '',
-    });
-
-    if (!isDistributorRoute) {
-      setCustomerName(null);
-      if (customerSelectRef.current) {
-        customerSelectRef.current.clearValue();
-      }
-    }
-
-    setRemarks('');
-    setTotals({
-      qty: 0,
-      amount: 0,
-      netAmt: 0,
-      grossAmt: 0,
-      sgstAmt: 0,
-      cgstAmt: 0,
-      igstAmt: 0,
-      totalAmount: 0,
-    });
-
-    // Reset refs
-    inputRefs.current = [];
-    selectRefs.current = [];
-    editingRowInputRefs.current = {};
-
-    // Focus on editing row select
-    setTimeout(() => {
-      editingRowSelectRef.current?.focus();
-    }, 100);
-  };
-
-  useEffect(() => {
-    if (database.length > 0) {
-      postOrder();
-    }
-  }, [database]);
-
-  useEffect(() => {
-  const totalQty = orderData.reduce((sum, row) => sum + Number(row.itemQty || 0), 0);
-  const totalAmt = orderData.reduce((sum, row) => sum + Number(row.amount || 0), 0);
-
-  // Calculate GST totals based on state
-  const totalSgstAmt = orderData.reduce((sum, row) => sum + Number(row.sgst || 0), 0);
-  const totalCgstAmt = orderData.reduce((sum, row) => sum + Number(row.cgst || 0), 0);
-  const totalIgstAmt = orderData.reduce((sum, row) => sum + Number(row.igst || 0), 0);
-
-  const editingRowQty = Number(editingRow.quantity || 0);
-  const editingRowAmount = Number(editingRow.amount || 0);
-  const editingRowSgst = Number(editingRow.sgst || 0);
-  const editingRowCgst = Number(editingRow.cgst || 0);
-  const editingRowIgst = Number(editingRow.igst || 0);
-
-  // Check if state is Tamil Nadu
-  if (isTamilNaduState()) {
-    // For Tamil Nadu: Amount + SGST + CGST
-    const totalAmountValue =
-      totalAmt +
-      editingRowAmount +
-      (totalSgstAmt + editingRowSgst) +
-      (totalCgstAmt + editingRowCgst);
-
-    setTotals({
-      qty: totalQty + editingRowQty,
-      amount: totalAmt + editingRowAmount,
-      sgstAmt: totalSgstAmt + editingRowSgst,
-      cgstAmt: totalCgstAmt + editingRowCgst,
-      igstAmt: 0, // IGST should be 0 for Tamil Nadu
-      netAmt: 0,
-      grossAmt: 0,
-      totalAmount: totalAmountValue,
-    });
-  } else {
-    // For other states: Amount + IGST
-    const totalAmountValue = totalAmt + editingRowAmount + (totalIgstAmt + editingRowIgst);
-
-    setTotals({
-      qty: totalQty + editingRowQty,
-      amount: totalAmt + editingRowAmount,
-      sgstAmt: 0, // SGST should be 0 for other states
-      cgstAmt: 0, // CGST should be 0 for other states
-      igstAmt: totalIgstAmt + editingRowIgst,
-      netAmt: 0,
-      grossAmt: 0,
-      totalAmount: totalAmountValue,
+  if (hasEditingRowData) {
+    rows.push({
+      itemCode: editingRow.item.item_code,
+      itemName: editingRow.item.stock_item_name,
+      hsn: editingRow.hsn,
+      gst: editingRow.gst,
+      sgst: editingRow.sgst,
+      cgst: editingRow.cgst,
+      igst: editingRow.igst,
+      delivery_date: editingRow.delivery_date,
+      delivery_mode: editingRow.delivery_mode,
+      itemQty: Number(editingRow.quantity),
+      uom: editingRow.item.uom || 'Nos',
+      rate: Number(editingRow.rate),
+      amount: Number(editingRow.rate) * Number(editingRow.quantity),
+      netRate: Number(editingRow.rate),
+      grossAmount: Number(editingRow.rate) * Number(editingRow.quantity),
     });
   }
-}, [orderData, editingRow, selectedCustomer, isDistributorRoute, distributorUser]);
+
+  const payload = rows.map(item => ({
+    voucher_type: voucherType,
+    order_no: orderNumber,
+    date,
+    status: 'pending',
+    executiveCode: distributorUser.customer_code || '',
+    executive: distributorUser.customer_name || '',
+    role: distributorUser.role || '',
+    ...customer,
+    item_code: item.itemCode,
+    item_name: item.itemName,
+    hsn: item.hsn,
+    gst: Number(item.gst || 0),
+    sgst: Number(item.sgst || 0),
+    cgst: Number(item.cgst || 0),
+    igst: Number(item.igst || 0),
+    delivery_date: convertToMySQLDate(item.delivery_date),
+    delivery_mode: item.delivery_mode,
+    quantity: item.itemQty,
+    uom: item.uom,
+    rate: item.rate,
+    amount: item.amount,
+    net_rate: item.netRate,
+    gross_amount: item.grossAmount,
+    // 🔥 FIX — NEVER NULL
+    disc_percentage: 0,
+    disc_amount: 0,
+    spl_disc_percentage: 0,
+    spl_disc_amount: 0,
+    total_quantity: totals.qty,
+    total_amount: totals.totalAmount,
+    remarks: remarks || '',
+  }));
+
+  await postOrder(payload);
+  resetForm();
+};
+
+
+  const resetForm = () => {
+  isResettingRef.current = true;
+
+  setOrderData([]);
+  setEditingRow({
+    item: null,
+    delivery_date: '',
+    delivery_mode: '',
+    quantity: '',
+    rate: '',
+    amount: '',
+    hsn: '',
+    gst: '',
+    sgst: '',
+    cgst: '',
+    igst: '',
+  });
+
+  setTotals({
+    qty: 0,
+    amount: 0,
+    sgstAmt: 0,
+    cgstAmt: 0,
+    igstAmt: 0,
+    netAmt: 0,
+    grossAmt: 0,
+    totalAmount: 0,
+  });
+
+  const next = generateOrderNumber();
+  setOrderNumber(next);
+  saveOrderNumber(next);
+
+  setRemarks('');
+  setDate(new Date().toISOString().split('T')[0]);
+
+  setTimeout(() => {
+    isResettingRef.current = false;
+  }, 0);
+};
+
+useEffect(() => {
+  if (isResettingRef.current) return;
+
+  // totals calculation logic here
+}, [orderData, editingRow]);
+
+
+//   useEffect(() => {
+//   // Only call postOrder if database has data AND we're not already submitting
+//   if (database.length > 0 && !isSubmitttingRef.current) {
+//     postOrder();
+//   }
+// }, [database]);
+
+  useEffect(() => {
+    const totalQty = orderData.reduce((sum, row) => sum + Number(row.itemQty || 0), 0);
+    const totalAmt = orderData.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+
+    // Calculate GST totals based on state
+    const totalSgstAmt = orderData.reduce((sum, row) => sum + Number(row.sgst || 0), 0);
+    const totalCgstAmt = orderData.reduce((sum, row) => sum + Number(row.cgst || 0), 0);
+    const totalIgstAmt = orderData.reduce((sum, row) => sum + Number(row.igst || 0), 0);
+
+    const editingRowQty = Number(editingRow.quantity || 0);
+    const editingRowAmount = Number(editingRow.amount || 0);
+    const editingRowSgst = Number(editingRow.sgst || 0);
+    const editingRowCgst = Number(editingRow.cgst || 0);
+    const editingRowIgst = Number(editingRow.igst || 0);
+
+    // Check if state is Tamil Nadu
+    if (isTamilNaduState()) {
+      // For Tamil Nadu: Amount + SGST + CGST
+      const totalAmountValue =
+        totalAmt +
+        editingRowAmount +
+        (totalSgstAmt + editingRowSgst) +
+        (totalCgstAmt + editingRowCgst);
+
+      setTotals({
+        qty: totalQty + editingRowQty,
+        amount: totalAmt + editingRowAmount,
+        sgstAmt: totalSgstAmt + editingRowSgst,
+        cgstAmt: totalCgstAmt + editingRowCgst,
+        igstAmt: 0, // IGST should be 0 for Tamil Nadu
+        netAmt: 0,
+        grossAmt: 0,
+        totalAmount: totalAmountValue,
+      });
+    } else {
+      // For other states: Amount + IGST
+      const totalAmountValue = totalAmt + editingRowAmount + (totalIgstAmt + editingRowIgst);
+
+      setTotals({
+        qty: totalQty + editingRowQty,
+        amount: totalAmt + editingRowAmount,
+        sgstAmt: 0, // SGST should be 0 for other states
+        cgstAmt: 0, // CGST should be 0 for other states
+        igstAmt: totalIgstAmt + editingRowIgst,
+        netAmt: 0,
+        grossAmt: 0,
+        totalAmount: totalAmountValue,
+      });
+    }
+  }, [orderData, editingRow, selectedCustomer, isDistributorRoute, distributorUser]);
 
   const formatCurrency = value => {
     return new Intl.NumberFormat('en-IN', {
@@ -1211,6 +1491,12 @@ const isTamilNaduState = () => {
       ...base,
       margin: 0,
       padding: 0,
+      fontSize: '12px',
+    }),
+    singleValue: base => ({
+      ...base,
+      fontSize: '11.5px', // Add this for the selected value
+      lineHeight: '1.2',
     }),
   };
 
@@ -1378,55 +1664,55 @@ const isTamilNaduState = () => {
       </div>
 
       {/* Body Part */}
-      <div className="mt-1 border h-[88.5vh]">
+      <div className="mt-1 border h-[88vh]">
         {/* Table section */}
         <div className="h-[75vh] flex flex-col">
           <table className="w-full table-fixed">
             <thead>
               <tr className="bg-green-800 leading-3">
-                <th className="font-medium text-sm border border-gray-300 py-0.5 w-10 text-center">
+                <th className="font-medium text-xs border border-gray-300 py-0.5 w-8 text-center">
                   S.No
                 </th>
-                <th className="font-medium text-sm border border-gray-300 py-0.5 px-2 w-32 text-center">
+                <th className="font-medium text-xs border border-gray-300 py-0.5 px-2 w-24 text-center">
                   Product Code
                 </th>
-                <th className="font-medium text-sm border border-gray-300 py-0.5 px-2 w-[250px] text-center">
+                <th className="font-medium text-xs border border-gray-300 py-0.5 px-2 w-[250px] text-center">
                   Product Name
                 </th>
-                <th className="font-medium text-sm border border-gray-300 py-0.5 px-2 text-center w-20">
+                <th className="font-medium text-xs border border-gray-300 py-0.5 px-2 text-center w-20">
                   Qty
                 </th>
-                <th className="font-medium text-sm border border-gray-300 py-0.5 w-12 text-center">
+                <th className="font-medium text-xs border border-gray-300 py-0.5 w-12 text-center">
                   UOM
                 </th>
-                <th className="font-medium text-sm border border-gray-300 py-0.5 px-2 text-center w-24">
+                <th className="font-medium text-xs border border-gray-300 py-0.5 px-2 text-center w-24">
                   Rate
                 </th>
-                <th className="font-medium text-sm border border-gray-300 py-0.5 w-28 text-center">
+                <th className="font-medium text-xs border border-gray-300 py-0.5 w-28 text-center">
                   Amount
                 </th>
-                <th className="font-medium text-sm border border-gray-300 py-0.5 text-center w-16">
+                <th className="font-medium text-xs border border-gray-300 py-0.5 text-center w-16">
                   HSN
                 </th>
-                <th className="font-medium text-sm border border-gray-300 py-0.5 px-1 w-16 text-center">
+                <th className="font-medium text-xs border border-gray-300 py-0.5 px-1 w-16 text-center">
                   GST %
                 </th>
-                <th className="font-medium text-sm border border-gray-300 py-0.5 px-1 w-20 text-center">
+                <th className="font-medium text-xs border border-gray-300 py-0.5 px-1 w-20 text-center">
                   SGST
                 </th>
-                <th className="font-medium text-sm border border-gray-300 py-0.5 px-1 w-20 text-center">
+                <th className="font-medium text-xs border border-gray-300 py-0.5 px-1 w-20 text-center">
                   CGST
                 </th>
-                <th className="font-medium text-sm border border-gray-300 py-0.5 px-1 w-20 text-center">
+                <th className="font-medium text-xs border border-gray-300 py-0.5 px-1 w-20 text-center">
                   IGST
                 </th>
-                <th className="font-medium text-sm border border-gray-300 py-0.5 text-center w-20">
+                <th className="font-medium text-xs border border-gray-300 py-0.5 text-center w-20">
                   DL. Date
                 </th>
-                <th className="font-medium text-sm border border-gray-300 py-0.5 text-center w-28">
+                <th className="font-medium text-xs border border-gray-300 py-0.5 text-center w-28">
                   DL. Mode
                 </th>
-                <th className="font-medium text-sm border border-gray-300 py-0.5 px-2 text-center w-16">
+                <th className="font-medium text-xs border border-gray-300 py-0.5 px-2 text-center w-14">
                   Action
                 </th>
               </tr>
@@ -1438,245 +1724,268 @@ const isTamilNaduState = () => {
             <table className="w-full table-fixed">
               <tbody>
                 {/* Existing rows */}
-                {orderData.map((row, rowIndex) => (
-                  <tr key={rowIndex} className="leading-4 hover:bg-gray-50">
-                    <td className="border border-gray-400 text-center text-sm w-10 align-middle">
-                      {rowIndex + 1}
-                    </td>
+                {showRowValueRows &&
+                  orderData.length > 0 &&
+                  orderData.map((row, rowIndex) => (
+                    <tr key={rowIndex} className="leading-4 hover:bg-gray-50">
+                      <td className="border border-gray-400 text-center text-sm w-8 align-middle">
+                        {rowIndex + 1}
+                      </td>
 
-                    {/* Product Code (Select) */}
-                    <td className="border border-gray-400 text-left text-sm w-32 align-middle p-0.5">
-                      <Select
-                        ref={el => {
-                          selectRefs.current[rowIndex * totalCols + 1] = el;
-                        }}
-                        value={row.item}
-                        options={itemOptions}
-                        getOptionLabel={option =>
-                          option.label || `${option.item_code} - ${option.stock_item_name}`
-                        }
-                        getOptionValue={option => option.item_code}
-                        onChange={selected => handleItemSelect(selected, rowIndex)}
-                        // onKeyDown={e => handleKeyDownTable(e, rowIndex, 1, 'select')}
-                        placeholder=""
-                        styles={tableSelectStyles}
-                        components={{
-                          DropdownIndicator: () => null,
-                          IndicatorSeparator: () => null,
-                        }}
-                        formatOptionLabel={(option, { context }) => {
-                          if (context === 'menu') {
-                            return (
-                              option.label || `${option.item_code} - ${option.stock_item_name}`
-                            );
+                      {/* Product Code (Select) */}
+                      <td className="border border-gray-400 text-left text-sm w-24 align-middle p-0.5">
+                        <Select
+                          key={`row-select-${formResetKey}-${rowIndex}`}
+                          ref={el => {
+                            selectRefs.current[rowIndex * totalCols + 1] = el;
+                          }}
+                          value={row.item}
+                          options={itemOptions}
+                          getOptionLabel={option =>
+                            option.label || `${option.item_code} - ${option.stock_item_name}`
                           }
-                          return option.item_code;
-                        }}
-                        menuPortalTarget={document.body}
-                      />
-                    </td>
+                          getOptionValue={option => option.item_code}
+                          onChange={selected => handleItemSelect(selected, rowIndex)}
+                          // onKeyDown={e => handleKeyDownTable(e, rowIndex, 1, 'select')}
+                          placeholder=""
+                          styles={tableSelectStyles}
+                          components={{
+                            DropdownIndicator: () => null,
+                            IndicatorSeparator: () => null,
+                          }}
+                          formatOptionLabel={(option, { context }) => {
+                            if (context === 'menu') {
+                              return (
+                                option.label || `${option.item_code} - ${option.stock_item_name}`
+                              );
+                            }
+                            return option.item_code;
+                          }}
+                          menuPortalTarget={document.body}
+                        />
+                      </td>
 
-                    {/* Product Name */}
-                    <td className="border border-gray-400 px-2 text-sm w-[250px] align-middle p-0">
-                      <input
-                        ref={el => {
-                          inputRefs.current[rowIndex * totalCols + 2] = el;
-                        }}
-                        type="text"
-                        readOnly
-                        value={row.itemName || ''}
-                        className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent"
-                        onKeyDown={e => handleKeyDownTable(e, rowIndex, 2)}
-                      />
-                    </td>
+                      {/* Product Name */}
+                      <td className="border border-gray-400 px-2 text-sm w-[250px] align-middle p-0">
+                        <input
+                          ref={el => {
+                            inputRefs.current[rowIndex * totalCols + 2] = el;
+                          }}
+                          type="text"
+                          readOnly
+                          value={row.itemName || ''}
+                          className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent"
+                          onKeyDown={e => handleKeyDownTable(e, rowIndex, 2)}
+                        />
+                      </td>
 
-                    {/* Quantity */}
-                    <td className="border border-gray-400 text-sm bg-[#F8F4EC] w-20 align-middle p-0">
-                      <input
-                        ref={el => {
-                          inputRefs.current[rowIndex * totalCols + 3] = el;
-                        }}
-                        type="text"
-                        value={row.itemQty}
-                        onChange={e => handleFieldChange('itemQty', e.target.value, rowIndex)}
-                        onKeyDown={e => handleKeyDownTable(e, rowIndex, 3)}
-                        className="w-full h-full pl-2 pr-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-right"
-                        min="0"
-                      />
-                    </td>
+                      {/* Quantity */}
+                      <td className="border border-gray-400 text-sm bg-[#F8F4EC] w-20 align-middle p-0">
+                        <input
+                          ref={el => {
+                            inputRefs.current[rowIndex * totalCols + 3] = el;
+                          }}
+                          type="text"
+                          value={row.itemQty}
+                          onChange={e => handleFieldChange('itemQty', e.target.value, rowIndex)}
+                          onFocus={e => {
+                            e.target.setSelectionRange(0, e.target.value.length);
+                          }}
+                          onKeyDown={e => handleKeyDownTable(e, rowIndex, 3)}
+                          className="w-full h-full pl-2 pr-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-right"
+                          min="0"
+                        />
+                      </td>
 
-                    {/* UOM */}
-                    <td className="border border-gray-400 text-center text-[13px] w-12 align-middle p-0">
-                      <input
-                        ref={el => {
-                          inputRefs.current[rowIndex * totalCols + 4] = el;
-                        }}
-                        type="text"
-                        readOnly
-                        value={row.uom || "No's"}
-                        className="w-full h-full text-center focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent"
-                        onKeyDown={e => handleKeyDownTable(e, rowIndex, 4)}
-                      />
-                    </td>
+                      {/* UOM */}
+                      <td className="border border-gray-400 text-center text-[13px] w-12 align-middle p-0">
+                        <input
+                          ref={el => {
+                            inputRefs.current[rowIndex * totalCols + 4] = el;
+                          }}
+                          type="text"
+                          readOnly
+                          value={row.uom || "No's"}
+                          className="w-full h-full text-center focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent"
+                          onKeyDown={e => handleKeyDownTable(e, rowIndex, 4)}
+                        />
+                      </td>
 
-                    {/* Rate */}
-                    <td className="border border-gray-400 text-sm w-24 align-middle p-0">
-                      <input
-                        ref={el => {
-                          inputRefs.current[rowIndex * totalCols + 5] = el;
-                        }}
-                        type="text"
-                        value={formatCurrency(row.rate)}
-                        onChange={e => handleFieldChange('rate', e.target.value, rowIndex)}
-                        onKeyDown={e => handleKeyDownTable(e, rowIndex, 5)}
-                        className="w-full h-full pl-1 pr-2 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-right"
-                        min="0"
-                        step="0.01"
-                        readOnly
-                      />
-                    </td>
+                      {/* Rate */}
+                      <td className="border border-gray-400 text-sm w-24 align-middle p-0">
+                        <input
+                          ref={el => {
+                            inputRefs.current[rowIndex * totalCols + 5] = el;
+                          }}
+                          type="text"
+                          value={getExistingRowRateDisplay(rowIndex, row.rate)}
+                          onChange={e => handleFieldChange('rate', e.target.value, rowIndex)}
+                          onKeyDown={e => handleKeyDownTable(e, rowIndex, 5)}
+                          onFocus={e => {
+                            handleRateFocus(rowIndex);
 
-                    {/* Amount */}
-                    <td className="border border-gray-400 text-right text-[12px] w-28 align-middle p-0 pr-2">
-                      <input
-                        ref={el => {
-                          inputRefs.current[rowIndex * totalCols + 6] = el;
-                        }}
-                        type="text"
-                        readOnly
-                        value={formatCurrency(row.amount)}
-                        className="w-full h-full text-right focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent"
-                        onKeyDown={e => handleKeyDownTable(e, rowIndex, 6)}
-                      />
-                    </td>
+                            // Get the raw value (not formatted) for selection
+                            const rawValue = row.rate || '';
 
-                    {/* HSN */}
-                    <td className="border border-gray-400 text-sm w-16 align-middle p-0">
-                      <input
-                        ref={el => {
-                          inputRefs.current[rowIndex * totalCols + 7] = el;
-                        }}
-                        type="text"
-                        value={row.hsn}
-                        onChange={e => handleFieldChange('hsn', e.target.value, rowIndex)}
-                        onKeyDown={e => handleKeyDownTable(e, rowIndex, 7)}
-                        className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-center"
-                        readOnly
-                      />
-                    </td>
+                            // Use setTimeout to ensure the value has been set
+                            setTimeout(() => {
+                              // Select all text
+                              e.target.setSelectionRange(0, rawValue.length);
+                            }, 10);
+                          }}
+                          onBlur={() => handleRateBlur(rowIndex)}
+                          className="w-full h-full pl-1 pr-2 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-right"
+                        />
+                      </td>
 
-                    {/* GST */}
-                    <td className="border border-gray-400 text-sm w-16 align-middle p-0">
-                      <input
-                        ref={el => {
-                          inputRefs.current[rowIndex * totalCols + 8] = el;
-                        }}
-                        type="text"
-                        value={row.gst}
-                        onChange={e => handleFieldChange('gst', e.target.value, rowIndex)}
-                        onKeyDown={e => handleKeyDownTable(e, rowIndex, 8)}
-                        className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-center"
-                        readOnly
-                      />
-                    </td>
+                      {/* Amount */}
+                      <td className="border border-gray-400 text-right text-[12px] w-28 align-middle p-0 pr-2">
+                        <input
+                          ref={el => {
+                            inputRefs.current[rowIndex * totalCols + 6] = el;
+                          }}
+                          type="text"
+                          readOnly
+                          value={formatCurrency(row.amount)}
+                          className="w-full h-full text-right focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent"
+                          onKeyDown={e => handleKeyDownTable(e, rowIndex, 6)}
+                        />
+                      </td>
 
-                    {/* SGST */}
-                    <td className="border border-gray-400 text-sm w-20 align-middle p-0">
-                      <input
-                        ref={el => {
-                          inputRefs.current[rowIndex * totalCols + 9] = el;
-                        }}
-                        type="text"
-                        value={formatCurrency(row.sgst)}
-                        onChange={e => handleFieldChange('sgst', e.target.value, rowIndex)}
-                        onKeyDown={e => handleKeyDownTable(e, rowIndex, 9)}
-                        className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-center"
-                        readOnly
-                      />
-                    </td>
+                      {/* HSN */}
+                      <td className="border border-gray-400 text-sm w-16 align-middle p-0">
+                        <input
+                          ref={el => {
+                            inputRefs.current[rowIndex * totalCols + 7] = el;
+                          }}
+                          type="text"
+                          value={row.hsn}
+                          onChange={e => handleFieldChange('hsn', e.target.value, rowIndex)}
+                          onKeyDown={e => handleKeyDownTable(e, rowIndex, 7)}
+                          className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-center"
+                          readOnly
+                        />
+                      </td>
 
-                    {/* CGST */}
-                    <td className="border border-gray-400 text-sm w-20 align-middle p-0">
-                      <input
-                        ref={el => {
-                          inputRefs.current[rowIndex * totalCols + 10] = el;
-                        }}
-                        type="text"
-                        value={formatCurrency(row.cgst)}
-                        onChange={e => handleFieldChange('cgst', e.target.value, rowIndex)}
-                        onKeyDown={e => handleKeyDownTable(e, rowIndex, 10)}
-                        className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-center"
-                        readOnly
-                      />
-                    </td>
+                      {/* GST */}
+                      <td className="border border-gray-400 text-sm w-16 align-middle p-0">
+                        <input
+                          ref={el => {
+                            inputRefs.current[rowIndex * totalCols + 8] = el;
+                          }}
+                          type="text"
+                          value={row.gst}
+                          onChange={e => handleFieldChange('gst', e.target.value, rowIndex)}
+                          onKeyDown={e => handleKeyDownTable(e, rowIndex, 8)}
+                          className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-center"
+                          readOnly
+                        />
+                      </td>
 
-                    {/* IGST */}
-                    <td className="border border-gray-400 text-sm w-20 align-middle p-0">
-                      <input
-                        ref={el => {
-                          inputRefs.current[rowIndex * totalCols + 11] = el;
-                        }}
-                        type="text"
-                        value={row.igst}
-                        onChange={e => handleFieldChange('igst', e.target.value, rowIndex)}
-                        onKeyDown={e => handleKeyDownTable(e, rowIndex, 11)}
-                        className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-center"
-                        readOnly
-                      />
-                    </td>
+                      {/* SGST */}
+                      <td className="border border-gray-400 text-sm w-20 align-middle p-0">
+                        <input
+                          ref={el => {
+                            inputRefs.current[rowIndex * totalCols + 9] = el;
+                          }}
+                          type="text"
+                          value={formatCurrency(row.sgst)}
+                          onChange={e => handleFieldChange('sgst', e.target.value, rowIndex)}
+                          onKeyDown={e => handleKeyDownTable(e, rowIndex, 9)}
+                          className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-center"
+                          readOnly
+                        />
+                      </td>
 
-                    {/* Delivery Date */}
-                    <td className="border border-gray-400 text-sm w-20 align-middle p-0">
-                      <input
-                        ref={el => {
-                          inputRefs.current[rowIndex * totalCols + 12] = el;
-                        }}
-                        type="text"
-                        value={row.delivery_date}
-                        onChange={e => handleFieldChange('delivery_date', e.target.value, rowIndex)}
-                        onKeyDown={e => handleKeyDownTable(e, rowIndex, 12)}
-                        className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-center"
-                        placeholder=""
-                      />
-                    </td>
+                      {/* CGST */}
+                      <td className="border border-gray-400 text-sm w-20 align-middle p-0">
+                        <input
+                          ref={el => {
+                            inputRefs.current[rowIndex * totalCols + 10] = el;
+                          }}
+                          type="text"
+                          value={formatCurrency(row.cgst)}
+                          onChange={e => handleFieldChange('cgst', e.target.value, rowIndex)}
+                          onKeyDown={e => handleKeyDownTable(e, rowIndex, 10)}
+                          className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-center"
+                          readOnly
+                        />
+                      </td>
 
-                    {/* Delivery Mode */}
-                    <td className="border border-gray-400 text-sm w-28 align-middle p-0">
-                      <input
-                        ref={el => {
-                          inputRefs.current[rowIndex * totalCols + 13] = el;
-                        }}
-                        type="text"
-                        value={row.delivery_mode}
-                        onChange={e => handleFieldChange('delivery_mode', e.target.value, rowIndex)}
-                        onKeyDown={e => handleKeyDownTable(e, rowIndex, 13)}
-                        className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-center"
-                        placeholder="Mode"
-                      />
-                    </td>
+                      {/* IGST */}
+                      <td className="border border-gray-400 text-sm w-20 align-middle p-0">
+                        <input
+                          ref={el => {
+                            inputRefs.current[rowIndex * totalCols + 11] = el;
+                          }}
+                          type="text"
+                          value={formatCurrency(row.igst || 0)}
+                          onChange={e => handleFieldChange('igst', e.target.value, rowIndex)}
+                          onKeyDown={e => handleKeyDownTable(e, rowIndex, 11)}
+                          className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-center"
+                          readOnly
+                        />
+                      </td>
 
-                    {/* Action */}
-                    <td className="border border-gray-400 text-center text-sm w-16 align-middle">
-                      <button
-                        onClick={() => handleRemoveItem(rowIndex)}
-                        className="text-red-500 hover:text-red-600 p-1"
-                        title="Delete Item"
-                      >
-                        <AiFillDelete size={18} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                      {/* Delivery Date */}
+                      <td className="border border-gray-400 text-sm w-20 align-middle p-0">
+                        <input
+                          ref={el => {
+                            inputRefs.current[rowIndex * totalCols + 12] = el;
+                          }}
+                          type="text"
+                          value={row.delivery_date}
+                          onChange={e =>
+                            handleFieldChange('delivery_date', e.target.value, rowIndex)
+                          }
+                          onFocus={(e) => {e.target.setSelectionRange(0, e.target.value.length)}}
+                          onKeyDown={e => handleKeyDownTable(e, rowIndex, 12)}
+                          className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-center"
+                          placeholder=""
+                        />
+                      </td>
+
+                      {/* Delivery Mode */}
+                      <td className="border border-gray-400 text-sm w-28 align-middle p-0">
+                        <input
+                          ref={el => {
+                            inputRefs.current[rowIndex * totalCols + 13] = el;
+                          }}
+                          type="text"
+                          value={row.delivery_mode}
+                          onChange={e =>
+                            handleFieldChange('delivery_mode', e.target.value, rowIndex)
+                          }
+                          onKeyDown={e => handleKeyDownTable(e, rowIndex, 13)}
+                          onFocus={(e) => {e.target.setSelectionRange(0, e.target.value.length)}}
+                          className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-center"
+                          placeholder="Mode"
+                        />
+                      </td>
+
+                      {/* Action */}
+                      <td className="border border-gray-400 text-center text-sm w-14 align-middle">
+                        <button
+                          onClick={() => handleRemoveItem(rowIndex)}
+                          className="text-red-500 hover:text-red-600 p-1"
+                          title="Delete Item"
+                        >
+                          <AiFillDelete size={18} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
 
                 {/* Add new row (editing row) */}
                 <tr className="leading-12 bg-yellow-50 hover:bg-yellow-100">
-                  <td className="border border-gray-400 text-center text-sm w-10 align-middle">
-                    {orderData.length + 1}
+                  <td className="border border-gray-400 text-center text-sm w-8 align-middle">
+                    {showRowValueRows ? orderData.length + 1 : 1}
                   </td>
 
                   {/* Product Code (Select) - Editing Row */}
-                  <td className="border border-gray-400 text-left text-sm w-32 align-middle p-0.5">
+                  <td className="border border-gray-400 text-left text-sm w-24 align-middle p-0.5">
                     <Select
+                      key={`editing-select-${formResetKey}`}
                       ref={editingRowSelectRef}
                       value={editingRow.item}
                       options={itemOptions}
@@ -1719,6 +2028,9 @@ const isTamilNaduState = () => {
                       type="text"
                       value={editingRow.quantity}
                       onChange={e => handleFieldChange('quantity', e.target.value)}
+                      onFocus={e => {
+                        e.target.setSelectionRange(0, e.target.value.length);
+                      }}
                       onKeyDown={e => handleEditingRowKeyDown(e, 3)}
                       className="w-full h-full pl-2 pr-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-right"
                       min="0"
@@ -1743,14 +2055,24 @@ const isTamilNaduState = () => {
                     <input
                       ref={el => (editingRowInputRefs.current.rate = el)}
                       type="text"
-                      value={formatCurrency(editingRow.rate)}
+                      value={getEditingRowRateDisplay(editingRow.rate)}
                       onChange={e => handleFieldChange('rate', e.target.value)}
+                      onFocus={e => {
+                        handleRateFocus();
+
+                        // Get the raw value (not formatted) for selection
+                        const rawValue = editingRow.rate || '';
+
+                        // Use setTimeout to ensure the value has been set
+                        setTimeout(() => {
+                          // Select all text
+                          e.target.setSelectionRange(0, rawValue.length);
+                        }, 10);
+                      }}
+                      onBlur={() => handleRateBlur()}
                       onKeyDown={e => handleEditingRowKeyDown(e, 5)}
                       className="w-full h-full pl-1 pr-2 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-right"
-                      min="0"
-                      step="0.01"
                       placeholder=""
-                      readOnly
                     />
                   </td>
 
@@ -1827,7 +2149,7 @@ const isTamilNaduState = () => {
                     <input
                       ref={el => (editingRowInputRefs.current.igst = el)}
                       type="text"
-                      value={formatCurrency(editingRow.igst)}
+                      value={formatCurrency(editingRow.igst || 0)}
                       onChange={e => handleFieldChange('igst', e.target.value)}
                       onKeyDown={e => handleEditingRowKeyDown(e, 11)}
                       className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-center"
@@ -1843,6 +2165,7 @@ const isTamilNaduState = () => {
                       type="text"
                       value={editingRow.delivery_date}
                       onChange={e => handleFieldChange('delivery_date', e.target.value)}
+                      onFocus={(e) => {e.target.setSelectionRange(0, e.target.value.length)}}
                       onKeyDown={e => handleEditingRowKeyDown(e, 12)}
                       className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-center"
                       placeholder=""
@@ -1857,13 +2180,14 @@ const isTamilNaduState = () => {
                       value={editingRow.delivery_mode}
                       onChange={e => handleFieldChange('delivery_mode', e.target.value)}
                       onKeyDown={e => handleEditingRowKeyDown(e, 13)}
+                      onFocus={(e) => {e.target.setSelectionRange(0, e.target.value.length)}}
                       className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-center"
                       placeholder=""
                     />
                   </td>
 
                   {/* Action - Editing Row */}
-                  <td className="border border-gray-400 text-center text-sm w-16 align-middle">
+                  <td className="border border-gray-400 text-center text-sm w-14 align-middle">
                     <button
                       ref={addButtonRef}
                       onClick={handleAddRow}
@@ -1883,11 +2207,11 @@ const isTamilNaduState = () => {
         </div>
 
         {/* Footer section */}
-        <div className="h-[10vh] flex flex-col border-t">
+        <div className="h-[9vh] flex flex-col border-t">
           {/* row 1 */}
           <div className="flex items-center">
             <div className="flex justify-between w-full px-0.5">
-              <div className="w-[400px] px-0.5">
+              <div className="w-[300px] px-0.5">
                 <div className="relative flex gap-2 mt-1">
                   <textarea
                     name="remarks"
@@ -1915,7 +2239,7 @@ const isTamilNaduState = () => {
                 </div>
               </div>
               <div className="">
-                <p className="font-medium mt-1.5">Total :</p>
+                <p className="font-medium mt-1.5">:</p>
               </div>
               <div className="w-[1000px] px-0.5 py-1">
                 <table className="w-full border-b mb-1">
@@ -1946,7 +2270,7 @@ const isTamilNaduState = () => {
           {/* row 2 */}
           <div className="flex items-center justify-between">
             <div className="flex items-center">
-              <div className="mb-1 -ml-[-1410px] mr-1">
+              <div className="mb-0.5 -ml-[-1250px] mr-1">
                 <button
                   onClick={handleSubmit}
                   className="bg-[#693382] text-white px-5 rounded-[6px] py-1 outline-none cursor-pointer"

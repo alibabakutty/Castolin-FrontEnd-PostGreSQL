@@ -32,7 +32,7 @@ function App() {
           <Route path="/unauthorized" element={<Unauthorized />} />
           {/* Admin Routes */}
           <Route path='/admin' element={
-            <ProtectedRoutes roles={['admin', 'distributor', 'direct']} >
+            <ProtectedRoutes roles={['admin']} >
               <AdminDashboard />
             </ProtectedRoutes>
           } />
@@ -41,14 +41,14 @@ function App() {
             path="/distributor"
             element={
             <ProtectedRoutes 
-            roles={['admin', 'distributor', 'direct']}
+            roles={['admin', 'distributor']}
             >
               <DistributorDashboard />
             </ProtectedRoutes>}
           />
           {/* Corporate routes */}
           <Route path='/corporate' element={
-            <ProtectedRoutes roles={['admin', 'distributor', 'direct']}>
+            <ProtectedRoutes roles={['admin', 'direct']}>
               <CorporateDashboard />
             </ProtectedRoutes>
           } />

@@ -13,6 +13,7 @@ const ContextProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [distributorUser, setDistributorUser] = useState(null);
   const [role, setRole] = useState(null);
+  const [state, setState] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isSigningUp, setIsSigningUp] = useState(false);
 
@@ -28,6 +29,7 @@ const ContextProvider = ({ children }) => {
         const token = await firebaseUser.getIdToken();
         let userData = null;
         let role = null;
+        let stateValue = null;
         let distributorData = null;
 
         try {
@@ -45,9 +47,13 @@ const ContextProvider = ({ children }) => {
                 headers: { Authorization: `Bearer ${token}` },
               });
 
+              console.log(`${storedUserType} API Response:`, res.data); // Debug log
+
               if (res.data && res.data[0]) {
                 userData = res.data[0];
-                role = userData.role;
+                console.log(`${storedUserType} User Data:`, userData); // Debug log
+                role = userData?.role || null;
+                stateValue = userData?.state || null;
 
                 // Set distributor data if user is distributor
                 if (storedUserType === 'distributor') {
@@ -76,7 +82,8 @@ const ContextProvider = ({ children }) => {
 
                 if (res.data && res.data[0]) {
                   userData = res.data[0];
-                  role = userData.role;
+                  role = userData?.role || null;
+                  stateValue = userData?.state || null;
 
                   // Set distributor data if user is distributor
                   if (endpoint.type === 'distributor') {
@@ -100,22 +107,26 @@ const ContextProvider = ({ children }) => {
             role: userData?.role || null,
             username: userData?.username || null,
             customer_name: userData?.customer_name || null,
+            state: stateValue,
           });
 
           // Set distributor user data separately
           setDistributorUser(distributorData);
           setRole(userData?.role || null);
+          setState(stateValue);
         } catch (err) {
           console.error('Auth state fetch failed:', err);
           setUser(firebaseUser);
           setDistributorUser(null);
           setRole(null);
+          setState(null);
         }
       } else {
         localStorage.removeItem('userType');
         setUser(null);
         setDistributorUser(null);
         setRole(null);
+        setState(null);
       }
       setLoading(false);
     });
@@ -166,16 +177,24 @@ const ContextProvider = ({ children }) => {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      const role = res.data[0]?.role || null;
+      console.log("Distributor login response:", res.data); // Debug log
 
+      const userData = res.data[0] || {};
+      console.log("Distributor user data:", userData); // Debug log
+      const role = res.data[0]?.role || null;
+      const stateValue = userData.state || null;
+
+      setDistributorUser(userData);
       // Immediately sync to context
-      setUser({ ...firebaseUser, role });
+      setUser({ ...firebaseUser, role, state: stateValue });
       setRole(role);
+      setState(stateValue);
 
       return {
         success: true,
         role,
         user: firebaseUser,
+        state: stateValue,
       };
     } catch (error) {
       console.error('Distributor login failed:', error);
@@ -194,16 +213,20 @@ const ContextProvider = ({ children }) => {
         headers: { Authorization: `Bearer ${token}` },
       });
 
+      const userData = res.data[0] || {};
       const role = res.data[0]?.role || null;
+      const stateValue = res.data[0]?.state || null;
 
       // Immediately sync to context
-      setUser({ ...firebaseUser, role });
+      setUser({ ...firebaseUser, role, state: stateValue });
       setRole(role);
+      setState(stateValue);
 
       return {
         success: true,
         role,
         user: firebaseUser,
+        state: stateValue,
       };
     } catch (error) {
       console.error('Corporate login failed:', error);
@@ -421,6 +444,7 @@ const ContextProvider = ({ children }) => {
       value={{
         role,
         user,
+        state,
         distributorUser,
         signup,
         createDistributorFirebaseAccount,
