@@ -11,7 +11,6 @@ const Order = ({ onBack }) => {
   const [customerName, setCustomerName] = useState(null);
   const [orderNumber, setOrderNumber] = useState('');
   // const [windowWidth, setWindowWidth] = useState(window.innerWidth);
-  const [database, setDatebase] = useState([]);
   const [itemOptions, setItemOptions] = useState([]);
   const [customerOptions, setCustomerOptions] = useState([]);
   const [orderData, setOrderData] = useState([]);
@@ -41,6 +40,7 @@ const Order = ({ onBack }) => {
 
   const location = useLocation();
   const isDistributorRoute = location.pathname.includes('/distributor');
+  const isDirectRoute = location.pathname.includes('/corporate');
 
   // Add a new empty row for data entry
   const [editingRow, setEditingRow] = useState({
@@ -72,7 +72,7 @@ const Order = ({ onBack }) => {
       if (e.key === 'Escape') {
         e.preventDefault();
         if (onBack) {
-          onBack();
+          
         } else {
           navigate(-1);
         }
@@ -86,18 +86,79 @@ const Order = ({ onBack }) => {
     };
   }, [onBack, navigate]);
 
-  // Focus on first field when component mounts
-  useEffect(() => {
-    if (!isDistributorRoute && customerSelectRef.current) {
-      setTimeout(() => {
-        customerSelectRef.current.focus();
-      }, 100);
-    } else if (isDistributorRoute && editingRowSelectRef.current) {
-      setTimeout(() => {
+// Focus management - SINGLE SOURCE OF TRUTH for initial focus
+useEffect(() => {
+  const timer = setTimeout(() => {
+    console.log('Focus management running for route:', location.pathname);
+    
+    if (isDistributorRoute) {
+      // For distributor route: Always focus editing row
+      if (editingRowSelectRef.current) {
         editingRowSelectRef.current.focus();
-      }, 100);
+        console.log('Focused editing row for distributor');
+      }
+    } else if (isDirectRoute) {
+      // For corporate route
+      if (!customerName) {
+        // No customer selected: Focus customer select
+        if (customerSelectRef.current) {
+          customerSelectRef.current.focus();
+          console.log('Focused customer select (no customer yet)');
+        }
+      } else {
+        // Customer is selected: Focus editing row
+        if (editingRowSelectRef.current) {
+          editingRowSelectRef.current.focus();
+          console.log('Focused editing row (customer selected)');
+        }
+      }
     }
-  }, [isDistributorRoute]);
+  }, 150);
+
+  return () => clearTimeout(timer);
+}, [isDistributorRoute, isDirectRoute, customerName, location.pathname]);
+
+  // Focus management
+useEffect(() => {
+  const handleFocus = () => {
+    if (isDistributorRoute) {
+      // Distributor route: Always focus editing row
+      if (editingRowSelectRef.current) {
+        editingRowSelectRef.current.focus();
+      }
+    } else if (isDirectRoute) {
+      // Corporate route logic
+      if (!customerName) {
+        // No customer selected: Focus customer select
+        if (customerSelectRef.current) {
+          customerSelectRef.current.focus();
+        }
+      } else {
+        // Customer already selected: Focus editing row
+        if (editingRowSelectRef.current) {
+          editingRowSelectRef.current.focus();
+        }
+      }
+    }
+  };
+
+  // Small delay to ensure DOM is ready
+  const timer = setTimeout(handleFocus, 100);
+  return () => clearTimeout(timer);
+}, [isDistributorRoute, isDirectRoute, customerName, location.pathname]);
+
+// Additional effect to handle customer selection
+useEffect(() => {
+  // When customer changes from null to a value (corporate route only)
+  if (isDirectRoute && customerName) {
+    const timer = setTimeout(() => {
+      if (editingRowSelectRef.current) {
+        editingRowSelectRef.current.focus();
+      }
+    }, 50);
+    return () => clearTimeout(timer);
+  }
+}, [customerName, isDirectRoute]);
 
   const [totals, setTotals] = useState({
     qty: 0,
@@ -236,7 +297,7 @@ const Order = ({ onBack }) => {
       // After selecting item, focus on quantity field
       setTimeout(() => {
         editingRowInputRefs.current.quantity?.focus();
-      }, 100);
+      }, 50);
     } else {
       // For existing rows
       const updatedRows = [...orderData];
@@ -249,7 +310,7 @@ const Order = ({ onBack }) => {
       updatedRows[index].sgst = '';
       updatedRows[index].cgst = '';
       updatedRows[index].igst = '';
-      updatedRows[index].uom = selected?.uom || "No's";
+      updatedRows[index].uom = selected?.uom || "Nos";
 
       if (updatedRows[index].itemQty && selected?.rate) {
         const amount = (Number(updatedRows[index].itemQty) || 0) * (Number(selected.rate) || 0);
@@ -280,7 +341,7 @@ const Order = ({ onBack }) => {
       setTimeout(() => {
         const quantityIndex = index * totalCols + 3;
         inputRefs.current[quantityIndex]?.focus();
-      }, 100);
+      }, 50);
     }
   };
 
@@ -721,72 +782,81 @@ const Order = ({ onBack }) => {
   };
 
   // Function to normalize different date formats to YYYY-MM-DD
-  const normalizeDateString = dateStr => {
-    if (!dateStr || typeof dateStr !== 'string') return '';
+  // const normalizeDateString = dateStr => {
+  //   if (!dateStr || typeof dateStr !== 'string') return '';
 
-    // Remove any whitespace and replace common separators with hyphens
-    const cleanedStr = dateStr.trim().replace(/[./]/g, '-');
+  //   // Remove any whitespace and replace common separators with hyphens
+  //   const cleanedStr = dateStr.trim().replace(/[./]/g, '-');
 
-    // Try to parse the date - multiple format attempts
-    let date = null;
+  //   // Try to parse the date - multiple format attempts
+  //   let date = null;
 
-    // Try parsing as DD-MM-YYYY (most common for your input)
-    const parts = cleanedStr.split('-');
-    if (parts.length === 3) {
-      const day = parts[0];
-      const month = parts[1];
-      const year = parts[2];
+  //   // Try parsing as DD-MM-YYYY (most common for your input)
+  //   const parts = cleanedStr.split('-');
+  //   if (parts.length === 3) {
+  //     const day = parts[0];
+  //     const month = parts[1];
+  //     const year = parts[2];
 
-      // Check if it's likely DD-MM-YYYY (day <= 31, month <= 12)
-      if (day.length <= 2 && month.length <= 2 && year.length === 4) {
-        // Use the constructor with individual parts to avoid timezone issues
-        date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-      }
-      // Check if it's YYYY-MM-DD
-      else if (year.length === 4 && month.length <= 2 && day.length <= 2) {
-        date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-      }
-    }
+  //     // Check if it's likely DD-MM-YYYY (day <= 31, month <= 12)
+  //     if (day.length <= 2 && month.length <= 2 && year.length === 4) {
+  //       // Use the constructor with individual parts to avoid timezone issues
+  //       date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+  //     }
+  //     // Check if it's YYYY-MM-DD
+  //     else if (year.length === 4 && month.length <= 2 && day.length <= 2) {
+  //       date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+  //     }
+  //   }
 
-    // If parsing failed, try the Date constructor directly
-    if (!date || isNaN(date.getTime())) {
-      date = new Date(cleanedStr);
-    }
+  //   // If parsing failed, try the Date constructor directly
+  //   if (!date || isNaN(date.getTime())) {
+  //     date = new Date(cleanedStr);
+  //   }
 
-    // Validate the date
-    if (!date || isNaN(date.getTime())) {
-      return ''; // Invalid date
-    }
+  //   // Validate the date
+  //   if (!date || isNaN(date.getTime())) {
+  //     return ''; // Invalid date
+  //   }
 
-    // Format as YYYY-MM-DD for consistency
-    const yearFormatted = date.getFullYear();
-    const monthFormatted = String(date.getMonth() + 1).padStart(2, '0');
-    const dayFormatted = String(date.getDate()).padStart(2, '0');
+  //   // Format as YYYY-MM-DD for consistency
+  //   const yearFormatted = date.getFullYear();
+  //   const monthFormatted = String(date.getMonth() + 1).padStart(2, '0');
+  //   const dayFormatted = String(date.getDate()).padStart(2, '0');
 
-    return `${yearFormatted}-${monthFormatted}-${dayFormatted}`;
-  };
+  //   return `${yearFormatted}-${monthFormatted}-${dayFormatted}`;
+  // };
 
   // Function to validate if a date is today or in the future
-  const validateFutureDate = dateStr => {
-    if (!dateStr) return false;
+const validateFutureDate = dateStr => {
+  if (!dateStr) return false;
 
-    const normalizedDate = normalizeDateString(dateStr);
-    if (!normalizedDate) return false;
+  // Use our formatter first
+  const normalizedDate = formatDateToDDMMYYYYSimple(dateStr);
+  if (!normalizedDate) return false;
 
-    const inputDate = new Date(normalizedDate);
-    const today = new Date();
+  // Parse DD-MM-YYYY format
+  const parts = normalizedDate.split('-');
+  if (parts.length !== 3) return false;
+  
+  const day = parseInt(parts[0]);
+  const month = parseInt(parts[1]) - 1; // Month is 0-indexed in JS
+  const year = parseInt(parts[2]);
+  
+  const inputDate = new Date(year, month, day);
+  const today = new Date();
 
-    // Set both dates to start of day for accurate comparison
-    const inputDateStart = new Date(
-      inputDate.getFullYear(),
-      inputDate.getMonth(),
-      inputDate.getDate(),
-    );
-    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  // Set both dates to start of day for accurate comparison
+  const inputDateStart = new Date(
+    inputDate.getFullYear(),
+    inputDate.getMonth(),
+    inputDate.getDate(),
+  );
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
 
-    // Date must be >= today
-    return inputDateStart >= todayStart;
-  };
+  // Date must be >= today
+  return inputDateStart >= todayStart;
+};
 
   // Enhanced keyboard navigation handler with validation
   const handleKeyDownTable = (e, rowIndex, colIndex, fieldType = 'input') => {
@@ -1112,6 +1182,13 @@ const Order = ({ onBack }) => {
     }
   };
 
+  const handleBackClick = () => {
+  const confirmLeave = window.confirm('Do you want to leave this order?');
+  if (!confirmLeave) return;
+  onBack(); // your existing back logic
+};
+
+
   // Handler specifically for editing row
   const handleEditingRowKeyDown = (e, colIndex, fieldType = 'input') => {
     const rowIndex = orderData.length; // Editing row is always last
@@ -1215,6 +1292,78 @@ const Order = ({ onBack }) => {
     throw err;
   } finally {
     isSubmitttingRef.current = false;
+  }
+};
+
+// Alternative simpler version if you prefer:
+const formatDateToDDMMYYYYSimple = (dateStr) => {
+  if (!dateStr || typeof dateStr !== 'string') return '';
+  
+  const cleanedStr = dateStr.trim();
+  
+  // Already in correct format
+  if (/^\d{2}-\d{2}-\d{4}$/.test(cleanedStr)) {
+    return cleanedStr;
+  }
+  
+  // Extract numbers using regex
+  const numbers = cleanedStr.match(/\d+/g);
+  if (!numbers || numbers.length < 3) return cleanedStr;
+  
+  let day, month, year;
+  
+  // Convert 2-digit year to 4-digit
+  if (numbers[2].length === 2) {
+    const shortYear = parseInt(numbers[2]);
+    year = shortYear < 50 ? 2000 + shortYear : 1900 + shortYear;
+  } else if (numbers[2].length === 4) {
+    year = numbers[2];
+  } else {
+    return cleanedStr;
+  }
+  
+  // Simple logic for day/month detection (common Indian format DD-MM-YYYY)
+  if (parseInt(numbers[0]) <= 31 && parseInt(numbers[1]) <= 12) {
+    day = numbers[0];
+    month = numbers[1];
+  } else if (parseInt(numbers[0]) <= 12 && parseInt(numbers[1]) <= 31) {
+    // Could be MM-DD format, but assuming DD-MM for India
+    day = numbers[1];
+    month = numbers[0];
+  } else {
+    day = numbers[0];
+    month = numbers[1];
+  }
+  
+  // Pad with zeros
+  day = day.padStart(2, '0');
+  month = month.padStart(2, '0');
+  
+  return `${day}-${month}-${year}`;
+};
+
+// Handle date blur formatting
+const handleDateBlur = (e, index) => {
+  const value = e.target.value;
+  
+  if (!value) return;
+  
+  const formattedDate = formatDateToDDMMYYYYSimple(value);
+  
+  if (index === undefined) {
+    // For editing row
+    setEditingRow(prev => ({
+      ...prev,
+      delivery_date: formattedDate
+    }));
+  } else {
+    // For existing rows
+    handleFieldChange('delivery_date', formattedDate, index);
+  }
+  
+  // Optional: Show toast if date was reformatted
+  if (formattedDate !== value) {
+    console.log(`Date reformatted: ${value} -> ${formattedDate}`);
   }
 };
 
@@ -1505,7 +1654,7 @@ useEffect(() => {
       {/* Header section remains same */}
       <div className="px-1 py-2 grid grid-cols-[auto_1fr_1fr_0.8fr_2fr_1.2fr_1.2fr] gap-2 items-center border transition-all">
         <button
-          onClick={onBack}
+          onClick={handleBackClick}
           className="p-1 rounded hover:bg-gray-200 transition justify-self-start"
         >
           <AiOutlineArrowLeft className="text-[#932F67]" size={22} />
@@ -1939,6 +2088,7 @@ useEffect(() => {
                             handleFieldChange('delivery_date', e.target.value, rowIndex)
                           }
                           onFocus={(e) => {e.target.setSelectionRange(0, e.target.value.length)}}
+                          onBlur={(e) => handleDateBlur(e, rowIndex)}
                           onKeyDown={e => handleKeyDownTable(e, rowIndex, 12)}
                           className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-center"
                           placeholder=""
@@ -1985,7 +2135,7 @@ useEffect(() => {
                   {/* Product Code (Select) - Editing Row */}
                   <td className="border border-gray-400 text-left text-sm w-24 align-middle p-0.5">
                     <Select
-                      key={`editing-select-${formResetKey}`}
+                      // key={`editing-select-${formResetKey}`}
                       ref={editingRowSelectRef}
                       value={editingRow.item}
                       options={itemOptions}
@@ -2166,6 +2316,7 @@ useEffect(() => {
                       value={editingRow.delivery_date}
                       onChange={e => handleFieldChange('delivery_date', e.target.value)}
                       onFocus={(e) => {e.target.setSelectionRange(0, e.target.value.length)}}
+                      onBlur={(e) => handleDateBlur(e)}
                       onKeyDown={e => handleEditingRowKeyDown(e, 12)}
                       className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-center"
                       placeholder=""

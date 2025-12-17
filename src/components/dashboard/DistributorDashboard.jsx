@@ -124,12 +124,12 @@ const DistributorDashboard = () => {
                 </span>
                 {user.role && (
                   <span className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full">
-                    {user.role || 'nothing'}
+                    {user.role || 'not given'}
                   </span>
                 )}
                 {user?.state && (
                   <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
-                    {user.state || 'nothing'}
+                    {user.state || 'not given'}
                   </span>
                 )}
               </div>
