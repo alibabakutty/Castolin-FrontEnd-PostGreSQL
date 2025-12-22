@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Order from '../orders-page/Order';
+// import Order from '../orders-page/Order';
 import { logout } from '../../auth/auth';
 import { toast } from 'react-toastify';
 import ViewFetchDistributor from '../reports-page/ViewFetchDistributor';
 import { useAuth } from '../../context/authConstants';
+import NewOrder from '../orders-page/NewOrder';
 
 const DistributorDashboard = () => {
   const [currentPage, setCurrentPage] = useState('dashboard');
@@ -49,7 +50,7 @@ const DistributorDashboard = () => {
 
   // Show only Dashboard for now (you can add other pages later)
   if (currentPage === 'order-management') {
-    return <Order onBack={() => setCurrentPage('dashboard')} />;
+    return <NewOrder onBack={() => setCurrentPage('dashboard')} />;
   } else if (currentPage === 'fetch-distributor') {
     return <ViewFetchDistributor onBack={() => setCurrentPage('dashboard')} />;
   }

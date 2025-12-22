@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AiFillDelete, AiFillPlusCircle, AiOutlineArrowLeft } from 'react-icons/ai';
 import Select from 'react-select';
 import { toast } from 'react-toastify';
@@ -10,16 +10,13 @@ const Order = ({ onBack }) => {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [customerName, setCustomerName] = useState(null);
   const [orderNumber, setOrderNumber] = useState('');
-  // const [windowWidth, setWindowWidth] = useState(window.innerWidth);
   const [itemOptions, setItemOptions] = useState([]);
   const [customerOptions, setCustomerOptions] = useState([]);
   const [orderData, setOrderData] = useState([]);
   const [remarks, setRemarks] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [formResetKey, setFormResetKey] = useState(0);
-  // Add this state near your other state declarations
   const [focusedRateFields, setFocusedRateFields] = useState({
-    // Store focus state for each row
     editingRow: false,
     existingRows: {}, // key: rowIndex, value: boolean
   });
@@ -27,17 +24,14 @@ const Order = ({ onBack }) => {
   const isSubmitttingRef = useRef(false);
   const navigate = useNavigate();
   const [showRowValueRows, setShowRowValueRows] = useState(true);
-  // Refs for keyboard navigation - separate arrays for each row type
   const inputRefs = useRef([]);
   const selectRefs = useRef([]);
-  // Special refs for editing row
   const editingRowInputRefs = useRef({});
   const editingRowSelectRef = useRef(null);
   const addButtonRef = useRef(null);
   const isResettingRef = useRef(false);
-
+  const [isLoadingOrderNumber, setIsLoadingOrderNumber] = useState(false);
   const { distributorUser } = useAuth();
-
   const location = useLocation();
   const isDistributorRoute = location.pathname.includes('/distributor');
   const isDirectRoute = location.pathname.includes('/corporate');
@@ -72,7 +66,7 @@ const Order = ({ onBack }) => {
       if (e.key === 'Escape') {
         e.preventDefault();
         if (onBack) {
-          
+          onBack()
         } else {
           navigate(-1);
         }
@@ -118,33 +112,24 @@ useEffect(() => {
   return () => clearTimeout(timer);
 }, [isDistributorRoute, isDirectRoute, customerName, location.pathname]);
 
-  // Focus management
+// Remove duplicate focus effects and keep one comprehensive version
 useEffect(() => {
   const handleFocus = () => {
-    if (isDistributorRoute) {
-      // Distributor route: Always focus editing row
-      if (editingRowSelectRef.current) {
-        editingRowSelectRef.current.focus();
-      }
-    } else if (isDirectRoute) {
-      // Corporate route logic
-      if (!customerName) {
-        // No customer selected: Focus customer select
-        if (customerSelectRef.current) {
-          customerSelectRef.current.focus();
-        }
-      } else {
-        // Customer already selected: Focus editing row
-        if (editingRowSelectRef.current) {
-          editingRowSelectRef.current.focus();
+    // Small delay for DOM readiness
+    setTimeout(() => {
+      if (isDistributorRoute) {
+        editingRowSelectRef.current?.focus();
+      } else if (isDirectRoute) {
+        if (!customerName) {
+          customerSelectRef.current?.focus();
+        } else {
+          editingRowSelectRef.current?.focus();
         }
       }
-    }
+    }, 100);
   };
 
-  // Small delay to ensure DOM is ready
-  const timer = setTimeout(handleFocus, 100);
-  return () => clearTimeout(timer);
+  handleFocus();
 }, [isDistributorRoute, isDirectRoute, customerName, location.pathname]);
 
 // Additional effect to handle customer selection
@@ -171,48 +156,44 @@ useEffect(() => {
     totalAmount: 0,
   });
 
-  const generateOrderNumber = () => {
-    const today = new Date();
-    const currentDate = today.toISOString().split('T')[0];
-    const lastOrder = localStorage.getItem('lastOrder');
-
-    if (lastOrder) {
-      const lastOrderData = JSON.parse(lastOrder);
-      const lastOrderDate = lastOrderData.date;
-      const lastOrderNumber = lastOrderData.orderNumber;
-
-      if (lastOrderDate === currentDate) {
-        const parts = lastOrderNumber.split('-');
-        const lastSequence = parseInt(parts[parts.length - 1]);
-        const newSequence = (lastSequence + 1).toString().padStart(4, '0');
-        const day = today.getDate().toString().padStart(2, '0');
-        const month = (today.getMonth() + 1).toString().padStart(2, '0');
-        const year = today.getFullYear().toString().slice(-2);
-        return `SQ-${day}-${month}-${year}-${newSequence}`;
-      }
+  const fetchOrderNumberFromServer = async () => {
+    setIsLoadingOrderNumber(true);
+    try {
+      const response = await api.get('/orders/next-order-number');
+      setOrderNumber(response.data.orderNumber);
+      return response.data.orderNumber;
+    } catch (error) {
+      console.error('Error fetching order number from server:', error);
+      
+      // Fallback to client-side generation ONLY as last resort
+      const fallbackOrderNumber = generateClientSideOrderNumber();
+      setOrderNumber(fallbackOrderNumber);
+      return fallbackOrderNumber;
+    } finally {
+      setIsLoadingOrderNumber(false);
     }
+  };
 
+  const generateClientSideOrderNumber = () => {
+    const today = new Date();
     const day = today.getDate().toString().padStart(2, '0');
     const month = (today.getMonth() + 1).toString().padStart(2, '0');
     const year = today.getFullYear().toString().slice(-2);
-    return `SQ-${day}-${month}-${year}-0001`;
+    
+    // Generate a random suffix to prevent collisions
+    const randomSuffix = Math.floor(Math.random() * 9000 + 1000);
+    return `SQ-${day}-${month}-${year}-${randomSuffix}`;
   };
 
-  const saveOrderNumber = orderNum => {
-    const today = new Date().toISOString().split('T')[0];
-    localStorage.setItem(
-      'lastOrder',
-      JSON.stringify({
-        date: today,
-        orderNumber: orderNum,
-      }),
-    );
+  // 3. Initial load of order number
+useEffect(() => {
+  const initializeOrder = async () => {
+    await fetchOrderNumberFromServer();
+    // Other initialization logic here
   };
-
-  useEffect(() => {
-    const newOrderNumber = generateOrderNumber();
-    setOrderNumber(newOrderNumber);
-  }, [date]);
+  
+  initializeOrder();
+}, [date]); // Only re-fetch when date changes
 
   // useEffect(() => {
   //   const handleResize = () => setWindowWidth(window.innerWidth);
@@ -345,13 +326,11 @@ useEffect(() => {
     }
   };
 
-  const handleCustomerSelect = selected => {
+  const handleCustomerSelect = useCallback(selected => {
     setCustomerName(selected);
     setSelectedCustomer(selected);
-
-    // Recalculate GST for all items when customer changes
     recalculateGSTForAllItems(selected?.state || '');
-  };
+  }, []);
 
   // Helper function to recalculate GST for all items
   const recalculateGSTForAllItems = customerState => {
@@ -831,31 +810,38 @@ useEffect(() => {
 const validateFutureDate = dateStr => {
   if (!dateStr) return false;
 
-  // Use our formatter first
-  const normalizedDate = formatDateToDDMMYYYYSimple(dateStr);
-  if (!normalizedDate) return false;
+  const formattedDate = formatDateToDDMMYYYYSimple(dateStr);
+  if (!formattedDate) return false;
 
-  // Parse DD-MM-YYYY format
-  const parts = normalizedDate.split('-');
+  const parts = formattedDate.split('-');
   if (parts.length !== 3) return false;
   
-  const day = parseInt(parts[0]);
-  const month = parseInt(parts[1]) - 1; // Month is 0-indexed in JS
-  const year = parseInt(parts[2]);
+  const day = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10) - 1;
+  const year = parseInt(parts[2], 10);
+  
+  // Validate date parts
+  if (isNaN(day) || isNaN(month) || isNaN(year)) return false;
+  if (day < 1 || day > 31) return false;
+  if (month < 0 || month > 11) return false;
   
   const inputDate = new Date(year, month, day);
+  
+  // Check if date is valid
+  if (isNaN(inputDate.getTime())) return false;
+  
+  // Check if date components match (handles invalid dates like 31-Feb)
+  if (inputDate.getDate() !== day || 
+      inputDate.getMonth() !== month || 
+      inputDate.getFullYear() !== year) {
+    return false;
+  }
+  
   const today = new Date();
-
-  // Set both dates to start of day for accurate comparison
-  const inputDateStart = new Date(
-    inputDate.getFullYear(),
-    inputDate.getMonth(),
-    inputDate.getDate(),
-  );
-  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-
-  // Date must be >= today
-  return inputDateStart >= todayStart;
+  today.setHours(0, 0, 0, 0);
+  inputDate.setHours(0, 0, 0, 0);
+  
+  return inputDate >= today;
 };
 
   // Enhanced keyboard navigation handler with validation
@@ -1268,6 +1254,22 @@ const validateFutureDate = dateStr => {
     }
   }, [orderData.length, editingRow.item]);
 
+  useEffect(() => {
+  const fetchOrderNumber = async () => {
+    try {
+      const response = await api.get('/orders/next-order-number');
+      setOrderNumber(response.data.orderNumber);
+    } catch (error) {
+      console.error('Error fetching order number:', error);
+      // Fallback to client-side generation
+      const newOrderNumber = generateOrderNumber();
+      setOrderNumber(newOrderNumber);
+    }
+  };
+  
+  fetchOrderNumber();
+}, [date]);
+
   const postOrder = async payload => {
   if (isSubmitttingRef.current) return;
   isSubmitttingRef.current = true;
@@ -1390,6 +1392,15 @@ const handleDateBlur = (e, index) => {
   const handleSubmit = async e => {
   e.preventDefault();
 
+  // Validate order number
+    if (!orderNumber || orderNumber.trim() === '') {
+      toast.error('Order number is required. Please try again.', {
+        position: 'bottom-right',
+        autoClose: 3000,
+      });
+      return;
+    }
+
   if (!isDistributorRoute && !customerName) {
     toast.error('Please select a customer name.');
     return;
@@ -1473,12 +1484,23 @@ const handleDateBlur = (e, index) => {
     remarks: remarks || '',
   }));
 
-  await postOrder(payload);
-  resetForm();
+  try {
+    await postOrder(payload);
+    await resetForm();
+    toast.success('Order placed successfully! New order number generated.', {
+        position: 'bottom-right',
+        autoClose: 3000,
+      });
+  } catch (error) {
+    toast.error('Error placing order', {
+        position: 'bottom-right',
+        autoClose: 3000,
+      });
+  }
 };
 
 
-  const resetForm = () => {
+  const resetForm = async () => {
   isResettingRef.current = true;
 
   setOrderData([]);
@@ -1507,12 +1529,12 @@ const handleDateBlur = (e, index) => {
     totalAmount: 0,
   });
 
-  const next = generateOrderNumber();
-  setOrderNumber(next);
-  saveOrderNumber(next);
+  // await fetchOrderNumberFromServer();
 
   setRemarks('');
   setDate(new Date().toISOString().split('T')[0]);
+
+  setFormResetKey(prev => prev + 1);
 
   setTimeout(() => {
     isResettingRef.current = false;
@@ -1525,22 +1547,82 @@ useEffect(() => {
   // totals calculation logic here
 }, [orderData, editingRow]);
 
+  // useEffect(() => {
+  //   const totalQty = orderData.reduce((sum, row) => sum + Number(row.itemQty || 0), 0);
+  //   const totalAmt = orderData.reduce((sum, row) => sum + Number(row.amount || 0), 0);
 
-//   useEffect(() => {
-//   // Only call postOrder if database has data AND we're not already submitting
-//   if (database.length > 0 && !isSubmitttingRef.current) {
-//     postOrder();
-//   }
-// }, [database]);
+  //   // Calculate GST totals based on state
+  //   const totalSgstAmt = orderData.reduce((sum, row) => sum + Number(row.sgst || 0), 0);
+  //   const totalCgstAmt = orderData.reduce((sum, row) => sum + Number(row.cgst || 0), 0);
+  //   const totalIgstAmt = orderData.reduce((sum, row) => sum + Number(row.igst || 0), 0);
 
-  useEffect(() => {
-    const totalQty = orderData.reduce((sum, row) => sum + Number(row.itemQty || 0), 0);
-    const totalAmt = orderData.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+  //   const editingRowQty = Number(editingRow.quantity || 0);
+  //   const editingRowAmount = Number(editingRow.amount || 0);
+  //   const editingRowSgst = Number(editingRow.sgst || 0);
+  //   const editingRowCgst = Number(editingRow.cgst || 0);
+  //   const editingRowIgst = Number(editingRow.igst || 0);
 
-    // Calculate GST totals based on state
-    const totalSgstAmt = orderData.reduce((sum, row) => sum + Number(row.sgst || 0), 0);
-    const totalCgstAmt = orderData.reduce((sum, row) => sum + Number(row.cgst || 0), 0);
-    const totalIgstAmt = orderData.reduce((sum, row) => sum + Number(row.igst || 0), 0);
+  //   // Check if state is Tamil Nadu
+  //   if (isTamilNaduState()) {
+  //     // For Tamil Nadu: Amount + SGST + CGST
+  //     const totalAmountValue =
+  //       totalAmt +
+  //       editingRowAmount +
+  //       (totalSgstAmt + editingRowSgst) +
+  //       (totalCgstAmt + editingRowCgst);
+
+  //     setTotals({
+  //       qty: totalQty + editingRowQty,
+  //       amount: totalAmt + editingRowAmount,
+  //       sgstAmt: totalSgstAmt + editingRowSgst,
+  //       cgstAmt: totalCgstAmt + editingRowCgst,
+  //       igstAmt: 0, // IGST should be 0 for Tamil Nadu
+  //       netAmt: 0,
+  //       grossAmt: 0,
+  //       totalAmount: totalAmountValue,
+  //     });
+  //   } else {
+  //     // For other states: Amount + IGST
+  //     const totalAmountValue = totalAmt + editingRowAmount + (totalIgstAmt + editingRowIgst);
+
+  //     setTotals({
+  //       qty: totalQty + editingRowQty,
+  //       amount: totalAmt + editingRowAmount,
+  //       sgstAmt: 0, // SGST should be 0 for other states
+  //       cgstAmt: 0, // CGST should be 0 for other states
+  //       igstAmt: totalIgstAmt + editingRowIgst,
+  //       netAmt: 0,
+  //       grossAmt: 0,
+  //       totalAmount: totalAmountValue,
+  //     });
+  //   }
+  // }, [orderData, editingRow, selectedCustomer, isDistributorRoute, distributorUser]);
+
+  const memoTotals = useMemo(() => {
+    const totalQty = orderData.reduce(
+      (sum, row) => sum + Number(row.itemQty || 0),
+      0
+    );
+
+    const totalAmt = orderData.reduce(
+      (sum, row) => sum + Number(row.amount || 0),
+      0
+    );
+
+    const totalSgstAmt = orderData.reduce(
+      (sum , row) => sum + Number(row.sgst || 0),
+      0
+    );
+
+    const totalCgstAmt = orderData.reduce(
+      (sum, row) => sum + Number(row.cgst || 0),
+      0
+    );
+
+    const totalIgstAmt = orderData.reduce(
+      (sum, row) => sum + Number(row.igst || 0),
+      0
+    );
 
     const editingRowQty = Number(editingRow.quantity || 0);
     const editingRowAmount = Number(editingRow.amount || 0);
@@ -1548,41 +1630,46 @@ useEffect(() => {
     const editingRowCgst = Number(editingRow.cgst || 0);
     const editingRowIgst = Number(editingRow.igst || 0);
 
-    // Check if state is Tamil Nadu
     if (isTamilNaduState()) {
-      // For Tamil Nadu: Amount + SGST + CGST
-      const totalAmountValue =
-        totalAmt +
-        editingRowAmount +
-        (totalSgstAmt + editingRowSgst) +
-        (totalCgstAmt + editingRowCgst);
+      const totalAmountValue = totalAmt + editingRowAmount + (totalSgstAmt + editingRowSgst) + (totalCgstAmt + editingRowCgst);
 
-      setTotals({
+      return {
         qty: totalQty + editingRowQty,
         amount: totalAmt + editingRowAmount,
         sgstAmt: totalSgstAmt + editingRowSgst,
         cgstAmt: totalCgstAmt + editingRowCgst,
-        igstAmt: 0, // IGST should be 0 for Tamil Nadu
+        igstAmt: 0,
         netAmt: 0,
         grossAmt: 0,
         totalAmount: totalAmountValue,
-      });
-    } else {
-      // For other states: Amount + IGST
-      const totalAmountValue = totalAmt + editingRowAmount + (totalIgstAmt + editingRowIgst);
-
-      setTotals({
-        qty: totalQty + editingRowQty,
-        amount: totalAmt + editingRowAmount,
-        sgstAmt: 0, // SGST should be 0 for other states
-        cgstAmt: 0, // CGST should be 0 for other states
-        igstAmt: totalIgstAmt + editingRowIgst,
-        netAmt: 0,
-        grossAmt: 0,
-        totalAmount: totalAmountValue,
-      });
+      }
     }
-  }, [orderData, editingRow, selectedCustomer, isDistributorRoute, distributorUser]);
+
+    // Other states
+    const totalAmountValue = totalAmt + editingRowAmount + (totalIgstAmt + editingRowIgst);
+
+    return {
+      qty: totalQty + editingRowQty,
+      amount: totalAmt + editingRowAmount,
+      sgstAmt: 0,
+      cgstAmt: 0,
+      igstAmt: totalIgstAmt + editingRowIgst,
+      netAmt: 0,
+      grossAmt: 0,
+      totalAmount: totalAmountValue,
+    };
+  }, [
+    orderData,
+    editingRow,
+    selectedCustomer,
+    isDirectRoute,
+    isDistributorRoute,
+    distributorUser,
+  ]);
+
+  useEffect(() => {
+    setTotals(memoTotals);
+  }, [memoTotals]);
 
   const formatCurrency = value => {
     return new Intl.NumberFormat('en-IN', {
@@ -1684,7 +1771,7 @@ useEffect(() => {
             type="text"
             required
             readOnly
-            value={orderNumber}
+            value={isLoadingOrderNumber ? 'Loading....' : orderNumber}
             className="outline-none border rounded-[5px] focus:border-[#932F67] p-[3.5px] text-sm bg-transparent font-medium"
           />
           <span className="absolute left-2.5 top-[12px] transition-all pointer-events-none -translate-y-[17px] text-[#932F67] px-1.5 font-semibold text-[12px] bg-[#E9EFEC] leading-2 rounded">

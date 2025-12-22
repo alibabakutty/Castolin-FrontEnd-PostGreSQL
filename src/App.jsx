@@ -116,12 +116,6 @@ function App() {
             <DistributorMaster />
           </ProtectedRoutes>
         } />
-        {/* For pending order page */}
-        {/* <Route path='/order-report-pending/:orderNumber' element={
-          <ProtectedRoutes roles={['admin']}>
-            <CorporateOrder />
-          </ProtectedRoutes>
-        } /> */}
         {/* For fetch report page */}
         <Route path='/fetch-report' element={
           <ProtectedRoutes roles={['admin', 'distributor', 'direct']}>

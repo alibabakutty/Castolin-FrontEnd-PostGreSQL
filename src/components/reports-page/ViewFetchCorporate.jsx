@@ -245,7 +245,6 @@ const ViewFetchCorporate = ({ onBack }) => {
                 <div className='w-[15%] text-left'>{formatDate(order.created_at)}</div>
                 <div className='w-[20%] text-center'>{order.order_no}</div>
                 <div className='w-[35%] text-left truncate' title={order.customer_name}>{order.customer_name}</div>
-                <div className='w-[20%] text-left truncate' title={order.executive}>{order.executive?.toUpperCase()}</div>
                 <div className='w-[15%] text-center truncate'>{order.status.toUpperCase()}</div>
                 <div className='w-[20%] text-right pr-1'>₹ {Number(order.total_amount || 0).toFixed(2)}</div>
               </div>
@@ -295,7 +294,6 @@ const ViewFetchCorporate = ({ onBack }) => {
             <div className="w-[15%] text-left pl-2">Date</div>
             <div className="w-[20%] text-center">Vch No.</div>
             <div className="w-[35%] text-left">Customer</div>
-            <div className="w-[20%] text-left">Direct</div>
             <div className="w-[15%] text-center">Status</div>
             <div className="w-[20%] text-right pr-3">Amount</div>
           </div>

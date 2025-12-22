@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Order from '../orders-page/Order';
+// import Order from '../orders-page/Order';
 import { logout } from '../../auth/auth';
 import { toast } from 'react-toastify';
 import ViewFetchCorporate from '../reports-page/ViewFetchCorporate';
 import { useAuth } from '../../context/authConstants';
+import NewOrder from '../orders-page/NewOrder';
 
 const CorporateDashboard = () => {
   const [currentPage, setCurrentPage] = useState('dashboard');
@@ -49,7 +50,7 @@ const CorporateDashboard = () => {
 
   // show only Dashboard for now (you can add other pages later)
   if (currentPage === 'order-management') {
-    return <Order onBack={() => setCurrentPage('dashboard')} />;
+    return <NewOrder onBack={() => setCurrentPage('dashboard')} />;
   } else if (currentPage === 'fetch-corporate') {
     return <ViewFetchCorporate onBack={() => setCurrentPage('dashboard')} />;
   }
