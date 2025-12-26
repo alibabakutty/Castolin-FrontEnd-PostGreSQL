@@ -4,19 +4,21 @@ import api from '../../services/api';
 import TableRow from './TableRow';
 import EditingRow from './EditingRow';
 import { useNavigate } from 'react-router-dom';
+import { formatCurrency, formatDateToDDMMYYYYSimple, validateFutureDate } from './orderUtils';
 
 const OrderTable = ({
   orderData,
   setOrderData,
   editingRow,
   setEditingRow,
-  selectedCustomer,
-  distributorUser,
-  isDistributorRoute,
-  isDirectRoute,
   showRowValueRows,
   formResetKey,
   editingRowSelectRef,
+  isTamilNaduState,
+  isDistributorOrder,
+  isDirectOrder,
+  isDistributorReport,
+  isCorporateReport,
 }) => {
   const [itemOptions, setItemOptions] = useState([]);
   const [focusedRateFields, setFocusedRateFields] = useState({
@@ -28,8 +30,65 @@ const OrderTable = ({
   const editingRowInputRefs = useRef({});
   const addButtonRef = useRef(null);
   const navigate = useNavigate();
-  const totalCols = 15;
-  const actionColumnIndex = 14;
+  
+  // Calculate total columns based on order type
+  const totalCols = isDistributorOrder
+    ? 15
+    : isDirectOrder
+    ? 15
+    : isDistributorReport
+    ? 15
+    : isCorporateReport
+    ? 15
+    : 17;
+  
+  const actionColumnIndex = isDistributorOrder
+    ? 16
+    : isDirectOrder
+    ? 16
+    : isDistributorReport
+    ? 16
+    : isCorporateReport
+    ? 16
+    : 16;
+
+  // Helper function to check if discount columns are visible
+  const showDiscountColumns = () => {
+    return !isDistributorReport && !isCorporateReport && !isDistributorOrder && !isDirectOrder;
+  };
+
+  // Map logical column index to actual display column index
+  const getActualColumnIndex = (logicalIndex) => {
+    if (showDiscountColumns()) {
+      // All columns are visible
+      return logicalIndex;
+    } else {
+      // Discount columns (7, 8) are hidden
+      if (logicalIndex < 7) {
+        return logicalIndex; // Columns before discount stay same
+      } else if (logicalIndex === 7 || logicalIndex === 8) {
+        return -1; // These columns don't exist
+      } else {
+        return logicalIndex - 2; // Columns after discount shift left by 2
+      }
+    }
+  };
+
+  // Get next visible column for keyboard navigation
+  const getNextVisibleColumn = (currentIndex, direction = 1) => {
+    let nextIndex = currentIndex + direction;
+    
+    // Skip columns that don't exist based on order type
+    while (!showDiscountColumns() && (nextIndex === 7 || nextIndex === 8)) {
+      nextIndex += direction;
+    }
+    
+    // Make sure we stay within bounds
+    if (nextIndex < 1) nextIndex = 1;
+    if (nextIndex > actionColumnIndex) nextIndex = actionColumnIndex;
+    
+    return nextIndex;
+  };
 
   useEffect(() => {
     const fetchStockItems = async () => {
@@ -47,22 +106,6 @@ const OrderTable = ({
     };
     fetchStockItems();
   }, []);
-
-  // check if state is Tamil Nadu
-  const isTamilNaduState = useCallback(() => {
-    let customerState = '';
-    if (isDistributorRoute) {
-      customerState = distributorUser?.state || '';
-    } else {
-      customerState = selectedCustomer?.state || '';
-    }
-    const normalizedState = customerState.toLowerCase().trim();
-    return (
-      normalizedState === 'tamil nadu' ||
-      normalizedState === 'tn' ||
-      normalizedState === 'tamilnadu'
-    );
-  }, [isDistributorRoute, distributorUser, selectedCustomer]);
 
   // Calculate GST for a row
   const calculateGSTForRow = useCallback(
@@ -170,8 +213,11 @@ const OrderTable = ({
 
       // After selecting item, focus on quantity field
       setTimeout(() => {
-        const quantityIndex = index * totalCols + 3;
-        inputRefs.current[quantityIndex]?.focus();
+        const actualColIndex = getActualColumnIndex(3); // Quantity is column 3
+        if (actualColIndex !== -1) {
+          const quantityIndex = index * totalCols + actualColIndex;
+          inputRefs.current[quantityIndex]?.focus();
+        }
       }, 50);
     }
   };
@@ -282,6 +328,8 @@ const OrderTable = ({
       item: editingRow.item,
       itemCode: editingRow.item.item_code,
       itemName: editingRow.item.stock_item_name,
+      disc: editingRow.disc,
+      splDisc: editingRow.splDisc,
       hsn: editingRow.hsn,
       gst: editingRow.gst,
       sgst: editingRow.sgst,
@@ -307,6 +355,8 @@ const OrderTable = ({
       quantity: '',
       rate: '',
       amount: '',
+      disc: '',
+      splDisc: '',
       hsn: '',
       gst: '',
       sgst: '',
@@ -355,110 +405,15 @@ const OrderTable = ({
     }
   };
 
-  // Alternative simpler version if you prefer:
-  const formatDateToDDMMYYYYSimple = dateStr => {
-    if (!dateStr || typeof dateStr !== 'string') return '';
-
-    const cleanedStr = dateStr.trim();
-
-    // Already in correct format
-    if (/^\d{2}-\d{2}-\d{4}$/.test(cleanedStr)) {
-      return cleanedStr;
-    }
-
-    // Extract numbers using regex
-    const numbers = cleanedStr.match(/\d+/g);
-    if (!numbers || numbers.length < 3) return cleanedStr;
-
-    let day, month, year;
-
-    // Convert 2-digit year to 4-digit
-    if (numbers[2].length === 2) {
-      const shortYear = parseInt(numbers[2]);
-      year = shortYear < 50 ? 2000 + shortYear : 1900 + shortYear;
-    } else if (numbers[2].length === 4) {
-      year = numbers[2];
-    } else {
-      return cleanedStr;
-    }
-
-    // Simple logic for day/month detection (common Indian format DD-MM-YYYY)
-    if (parseInt(numbers[0]) <= 31 && parseInt(numbers[1]) <= 12) {
-      day = numbers[0];
-      month = numbers[1];
-    } else if (parseInt(numbers[0]) <= 12 && parseInt(numbers[1]) <= 31) {
-      // Could be MM-DD format, but assuming DD-MM for India
-      day = numbers[1];
-      month = numbers[0];
-    } else {
-      day = numbers[0];
-      month = numbers[1];
-    }
-
-    // Pad with zeros
-    day = day.padStart(2, '0');
-    month = month.padStart(2, '0');
-
-    return `${day}-${month}-${year}`;
-  };
-
-  // Format currency
-  const formatCurrency = value => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      maximumFractionDigits: 2,
-    })
-      .format(value || 0)
-      .replace(/^₹/, '₹ ');
-  };
-
   // Debug: Check if components are rendering
   console.log('OrderTable rendering:', {
     orderDataLength: orderData?.length,
     showRowValueRows,
     editingRow,
+    totalCols,
+    actionColumnIndex,
+    showDiscountColumns: showDiscountColumns(),
   });
-
-  // Function to validate if a date is today or in the future
-  const validateFutureDate = dateStr => {
-    if (!dateStr) return false;
-
-    const formattedDate = formatDateToDDMMYYYYSimple(dateStr);
-    if (!formattedDate) return false;
-
-    const parts = formattedDate.split('-');
-    if (parts.length !== 3) return false;
-
-    const day = parseInt(parts[0], 10);
-    const month = parseInt(parts[1], 10) - 1;
-    const year = parseInt(parts[2], 10);
-
-    // Validate date parts
-    if (isNaN(day) || isNaN(month) || isNaN(year)) return false;
-    if (day < 1 || day > 31) return false;
-    if (month < 0 || month > 11) return false;
-
-    const inputDate = new Date(year, month, day);
-
-    // Check if date is valid
-    if (isNaN(inputDate.getTime())) return false;
-
-    // Check if date components match (handles invalid dates like 31-Feb)
-    if (
-      inputDate.getDate() !== day ||
-      inputDate.getMonth() !== month ||
-      inputDate.getFullYear() !== year
-    ) {
-      return false;
-    }
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    inputDate.setHours(0, 0, 0, 0);
-
-    return inputDate >= today;
-  };
 
   // Handler specifically for editing row
   const handleEditingRowKeyDown = (e, colIndex, fieldType = 'input') => {
@@ -466,21 +421,116 @@ const OrderTable = ({
     handleKeyDownTable(e, rowIndex, colIndex, fieldType);
   };
 
-  // Enhanced keyboard navigation handler with validation
+  // Enhanced keyboard navigation handler with validation and column skipping
   const handleKeyDownTable = (e, rowIndex, colIndex, fieldType = 'input') => {
     const key = e.key;
     // Calculate total rows including editing row
     const totalRows = orderData.length + 1; // +1 for editing row
 
-    // Common function for moving to next cell (used by Enter, Tab, ArrowRight)
+    // Helper function to get actual column index considering hidden columns
+    const getActualColIndex = (logicalIndex) => {
+      if (!showDiscountColumns() && (logicalIndex === 7 || logicalIndex === 8)) {
+        return -1; // These columns don't exist
+      }
+      return logicalIndex;
+    };
+
+    // Helper function to get next logical column index (considering hidden columns)
+    const getNextLogicalColumn = (currentIndex, direction = 1) => {
+      let nextIndex = currentIndex + direction;
+      
+      // Skip hidden columns
+      while (!showDiscountColumns() && (nextIndex === 7 || nextIndex === 8)) {
+        nextIndex += direction;
+      }
+      
+      // Make sure we stay within bounds
+      if (nextIndex < 1) nextIndex = 1;
+      if (nextIndex > actionColumnIndex) nextIndex = actionColumnIndex;
+      
+      return nextIndex;
+    };
+
+    // Helper function to check if column exists
+    const columnExists = (col) => {
+      const actualIndex = getActualColIndex(col);
+      return actualIndex !== -1;
+    };
+
+    // Helper function to focus on editing row element
+    const focusEditingRow = (colIndex) => {
+      if (colIndex === 1) {
+        // Product Code (Select)
+        editingRowSelectRef.current?.focus();
+      } else if (colIndex === actionColumnIndex) {
+        // Add button in editing row
+        addButtonRef.current?.focus();
+      } else {
+        // Other fields in editing row
+        const fieldMap = {
+          2: 'itemName',
+          3: 'quantity',
+          4: 'uom',
+          5: 'rate',
+          6: 'amount',
+          9: 'hsn',
+          10: 'gst',
+          11: 'sgst',
+          12: 'cgst',
+          13: 'igst',
+          14: 'delivery_date',
+          15: 'delivery_mode',
+        };
+        
+        // Add discount fields only if visible
+        if (showDiscountColumns()) {
+          fieldMap[7] = 'disc';
+          fieldMap[8] = 'splDisc';
+        }
+        
+        const field = fieldMap[colIndex];
+        if (field && editingRowInputRefs.current[field]) {
+          editingRowInputRefs.current[field].focus();
+        }
+      }
+    };
+
+    // Helper function to focus on existing row element
+    const focusExistingRow = (rowIndex, colIndex) => {
+      const actualColIndex = getActualColumnIndex(colIndex);
+      if (actualColIndex !== -1) {
+        const refIndex = (rowIndex * totalCols) + actualColIndex;
+        
+        if (colIndex === 1) {
+          // Product Code (Select)
+          selectRefs.current[refIndex]?.focus();
+        } else if (colIndex === actionColumnIndex) {
+          // Delete button - skip it and move to previous column
+          moveToPrevCell();
+        } else {
+          // Other fields
+          inputRefs.current[refIndex]?.focus();
+        }
+      } else {
+        // Column doesn't exist, skip to next/prev
+        if (key === 'ArrowRight' || key === 'Enter' || key === 'Tab') {
+          moveToNextCell();
+        } else if (key === 'ArrowLeft' || key === 'Backspace') {
+          moveToPrevCell();
+        }
+      }
+    };
+
+    // Common function for moving to next cell
     const moveToNextCell = () => {
       // Get current row data
       const currentRowData = rowIndex === totalRows - 1 ? editingRow : orderData[rowIndex];
+      
       // Check validation based on current column
       let shouldPreventNavigation = false;
 
       if (colIndex === 3) {
-        // Quantity column
+        // Quantity column validation
         // if (!currentRowData.quantity || currentRowData.quantity.trim() === '') {
         //   shouldPreventNavigation = true;
         //   toast.error('Please enter quantity before proceeding!', {
@@ -488,7 +538,7 @@ const OrderTable = ({
         //     autoClose: 3000,
         //   });
         // }
-      } else if (colIndex === 12) {
+      } else if (colIndex === 14) {
         // Delivery Date column
         const dateStr = currentRowData.delivery_date || '';
 
@@ -505,7 +555,7 @@ const OrderTable = ({
             autoClose: 3000,
           });
         }
-      } else if (colIndex === 13) {
+      } else if (colIndex === 15) {
         // Delivery Mode column
         if (!currentRowData.delivery_mode || currentRowData.delivery_mode.trim() === '') {
           shouldPreventNavigation = true;
@@ -522,22 +572,22 @@ const OrderTable = ({
       }
 
       let nextRow = rowIndex;
-      let nextCol = colIndex + 1;
+      let nextCol = colIndex;
 
-      // If at last column (delivery_mode), move to action column (Add button)
-      if (colIndex === 13) {
-        // Delivery Mode column
-        nextCol = actionColumnIndex;
-      }
-      // If at last column (action), move to next row first column
-      else if (colIndex >= actionColumnIndex) {
+      // Find next visible column
+      do {
+        nextCol = getNextLogicalColumn(nextCol, 1);
+      } while (!columnExists(nextCol) && nextCol <= actionColumnIndex);
+
+      // If at last column, move to next row
+      if (nextCol > actionColumnIndex) {
         nextRow += 1;
-        nextCol = 1; // Skip S.No column
-      }
-      // If at last column before action, move to action
-      else if (nextCol >= totalCols) {
-        nextRow += 1;
-        nextCol = 1;
+        nextCol = 1; // Start with first column (Product Code select)
+        
+        // Skip hidden columns
+        while (!showDiscountColumns() && (nextCol === 7 || nextCol === 8)) {
+          nextCol += 1;
+        }
       }
 
       // If at last row and last column, stay at current
@@ -549,114 +599,47 @@ const OrderTable = ({
       setTimeout(() => {
         if (nextRow === totalRows - 1) {
           // Moving to editing row
-          if (nextCol === 1) {
-            // Product Code (Select)
-            editingRowSelectRef.current?.focus();
-          } else if (nextCol === actionColumnIndex) {
-            // Add button in editing row
-            addButtonRef.current?.focus();
-          } else {
-            // Other fields in editing row
-            const fieldMap = {
-              2: 'itemName',
-              3: 'quantity',
-              4: 'uom',
-              5: 'rate',
-              6: 'amount',
-              7: 'hsn',
-              8: 'gst',
-              9: 'sgst',
-              10: 'cgst',
-              11: 'igst',
-              12: 'delivery_date',
-              13: 'delivery_mode',
-            };
-            const field = fieldMap[nextCol];
-            if (field && editingRowInputRefs.current[field]) {
-              editingRowInputRefs.current[field].focus();
-            }
-          }
+          focusEditingRow(nextCol);
         } else {
           // Moving within existing rows
-          if (nextCol === 1) {
-            // Product Code (Select)
-            selectRefs.current[nextRow * totalCols + nextCol]?.focus();
-          } else if (nextCol === actionColumnIndex) {
-            // Delete button - skip it and move to next
-            handleKeyDownTable({ key: 'Enter' }, nextRow, nextCol);
-          } else {
-            // Other fields
-            inputRefs.current[nextRow * totalCols + nextCol]?.focus();
-          }
+          focusExistingRow(nextRow, nextCol);
         }
       }, 0);
     };
 
-    // Common function for moving to previous cell (used by ArrowLeft, Backspace)
+    // Common function for moving to previous cell
     const moveToPrevCell = () => {
       let prevRow = rowIndex;
-      let prevCol = colIndex - 1;
+      let prevCol = colIndex;
+
+      // Find previous visible column
+      do {
+        prevCol = getNextLogicalColumn(prevCol, -1);
+      } while (!columnExists(prevCol) && prevCol >= 1);
 
       if (prevCol < 1) {
-        // Skip S.No column
+        // Move to previous row
         prevRow -= 1;
-        prevCol = actionColumnIndex; // Go to action column of previous row
+        if (prevRow >= 0) {
+          prevCol = actionColumnIndex; // Go to action column of previous row
+        }
       }
 
       if (prevRow >= 0) {
         setTimeout(() => {
           if (prevRow === totalRows - 1) {
             // Moving within editing row backward
-            if (prevCol === 1) {
-              editingRowSelectRef.current?.focus();
-            } else if (prevCol === actionColumnIndex) {
-              addButtonRef.current?.focus();
-            } else {
-              const fieldMap = {
-                2: 'itemName',
-                3: 'quantity',
-                4: 'uom',
-                5: 'rate',
-                6: 'amount',
-                7: 'hsn',
-                8: 'gst',
-                9: 'sgst',
-                10: 'cgst',
-                11: 'igst',
-                12: 'delivery_date',
-                13: 'delivery_mode',
-              };
-              const field = fieldMap[prevCol];
-              if (field && editingRowInputRefs.current[field]) {
-                editingRowInputRefs.current[field].focus();
-              }
-            }
+            focusEditingRow(prevCol);
           } else {
             // Moving within existing rows backward
-            if (prevCol === 1) {
-              selectRefs.current[prevRow * totalCols + prevCol]?.focus();
-            } else if (prevCol === actionColumnIndex) {
-              // Skip delete button, move to previous column
-              handleKeyDownTable({ key: 'Backspace' }, prevRow, prevCol);
-            } else {
-              inputRefs.current[prevRow * totalCols + prevCol]?.focus();
-            }
+            focusExistingRow(prevRow, prevCol);
           }
         }, 0);
       }
     };
 
-    if (key === 'Enter' || key === 'Tab') {
-      e.preventDefault();
-      moveToNextCell();
-    } else if (key === 'ArrowRight') {
-      e.preventDefault();
-      moveToNextCell();
-    } else if (key === 'ArrowLeft' || key === 'Backspace') {
-      e.preventDefault();
-      moveToPrevCell();
-    } else if (key === 'ArrowDown') {
-      e.preventDefault();
+    // Handle arrow down
+    const handleArrowDown = () => {
       // Check validation before moving down
       const currentRowData = rowIndex === totalRows - 1 ? editingRow : orderData[rowIndex];
       let shouldPreventNavigation = false;
@@ -670,7 +653,7 @@ const OrderTable = ({
         //     autoClose: 3000,
         //   });
         // }
-      } else if (colIndex === 12) {
+      } else if (colIndex === 14) {
         // Delivery Date column
         if (!currentRowData.delivery_date || currentRowData.delivery_date.trim() === '') {
           shouldPreventNavigation = true;
@@ -679,7 +662,7 @@ const OrderTable = ({
             autoClose: 3000,
           });
         }
-      } else if (colIndex === 13) {
+      } else if (colIndex === 15) {
         // Delivery Mode column
         if (!currentRowData.delivery_mode || currentRowData.delivery_mode.trim() === '') {
           shouldPreventNavigation = true;
@@ -699,94 +682,47 @@ const OrderTable = ({
         setTimeout(() => {
           if (nextRow === totalRows - 1) {
             // Moving down to editing row
-            if (colIndex === 1) {
-              editingRowSelectRef.current?.focus();
-            } else if (colIndex === actionColumnIndex) {
-              addButtonRef.current?.focus();
-            } else {
-              const fieldMap = {
-                2: 'itemName',
-                3: 'quantity',
-                4: 'uom',
-                5: 'rate',
-                6: 'amount',
-                7: 'hsn',
-                8: 'gst',
-                9: 'sgst',
-                10: 'cgst',
-                11: 'igst',
-                12: 'delivery_date',
-                13: 'delivery_mode',
-              };
-              const field = fieldMap[colIndex];
-              if (field && editingRowInputRefs.current[field]) {
-                editingRowInputRefs.current[field].focus();
-              }
-            }
+            focusEditingRow(colIndex);
           } else {
             // Moving down within existing rows
-            if (colIndex === 1) {
-              selectRefs.current[nextRow * totalCols + colIndex]?.focus();
-            } else if (colIndex === actionColumnIndex) {
-              // Skip delete button, move to same column in next row
-              handleKeyDownTable({ key: 'ArrowDown' }, rowIndex, colIndex);
-            } else {
-              inputRefs.current[nextRow * totalCols + colIndex]?.focus();
-            }
+            focusExistingRow(nextRow, colIndex);
           }
         }, 0);
       }
-    } else if (key === 'ArrowUp') {
-      e.preventDefault();
+    };
+
+    // Handle arrow up
+    const handleArrowUp = () => {
       let prevRow = rowIndex - 1;
       if (prevRow >= 0) {
         setTimeout(() => {
           if (prevRow === totalRows - 1) {
-            // Moving up to editing row from below (shouldn't happen as editing is last)
-            // But handle it anyway
-            if (colIndex === 1) {
-              editingRowSelectRef.current?.focus();
-            } else if (colIndex === actionColumnIndex) {
-              addButtonRef.current?.focus();
-            } else {
-              const fieldMap = {
-                2: 'itemName',
-                3: 'quantity',
-                4: 'uom',
-                5: 'rate',
-                6: 'amount',
-                7: 'hsn',
-                8: 'gst',
-                9: 'sgst',
-                10: 'cgst',
-                11: 'igst',
-                12: 'delivery_date',
-                13: 'delivery_mode',
-              };
-              const field = fieldMap[colIndex];
-              if (field && editingRowInputRefs.current[field]) {
-                editingRowInputRefs.current[field].focus();
-              }
-            }
+            // Moving up to editing row from below
+            focusEditingRow(colIndex);
           } else {
             // Moving up within existing rows
-            if (colIndex === 1) {
-              selectRefs.current[prevRow * totalCols + colIndex]?.focus();
-            } else if (colIndex === actionColumnIndex) {
-              // Skip delete button, move to same column in previous row
-              handleKeyDownTable({ key: 'ArrowUp' }, rowIndex, colIndex);
-            } else {
-              inputRefs.current[prevRow * totalCols + colIndex]?.focus();
-            }
+            focusExistingRow(prevRow, colIndex);
           }
         }, 0);
       }
-    } else if (key === 'Escape') {
-      if (onBack) {
-        onBack();
-      } else {
-        navigate(-1);
-      }
+    };
+
+    // Handle key events
+    if (key === 'Enter' || key === 'Tab') {
+      e.preventDefault();
+      moveToNextCell();
+    } else if (key === 'ArrowRight') {
+      e.preventDefault();
+      moveToNextCell();
+    } else if (key === 'ArrowLeft' || key === 'Backspace') {
+      e.preventDefault();
+      moveToPrevCell();
+    } else if (key === 'ArrowDown') {
+      e.preventDefault();
+      handleArrowDown();
+    } else if (key === 'ArrowUp') {
+      e.preventDefault();
+      handleArrowUp();
     }
   };
 
@@ -816,8 +752,13 @@ const OrderTable = ({
       const prevRowIndex = orderData.length - 1;
       if (prevRowIndex >= 0) {
         // Since delete button is not focusable, move to Delivery Mode in previous row
+        const deliveryModeCol = showDiscountColumns() ? 15 : 13;
         setTimeout(() => {
-          inputRefs.current[prevRowIndex * totalCols + 13]?.focus();
+          const actualColIndex = getActualColumnIndex(deliveryModeCol);
+          if (actualColIndex !== -1) {
+            const refIndex = (prevRowIndex * totalCols) + actualColIndex;
+            inputRefs.current[refIndex]?.focus();
+          }
         }, 0);
       }
     } else if (key === 'ArrowDown') {
@@ -830,57 +771,76 @@ const OrderTable = ({
     }
   };
 
+  // Calculate editing row indices
+  const editingRowIndex = orderData.length;
+  const editingRowBaseIndex = editingRowIndex * totalCols;
+
   return (
     <div className="mt-1 border h-[76vh]">
       <div className="h-[75vh] flex flex-col">
         {/* Single table structure */}
-        <div className={`flex-1 overflow-y-auto ${orderData.length > 15 ? 'max-h-[65vh]' : ''}`}>
+        <div className={`flex-1 overflow-y-auto ${orderData.length > 17 ? 'max-h-[65vh]' : ''}`}>
           <table className="w-full table-fixed">
             <thead className="sticky top-0 z-10">
               <tr className="bg-green-800 leading-3">
-                <TableHeaderCell width="w-8">S.No</TableHeaderCell>
+                <TableHeaderCell width="w-9">S.No</TableHeaderCell>
                 <TableHeaderCell width="w-24">Product Code</TableHeaderCell>
-                <TableHeaderCell width="w-[250px]">Product Name</TableHeaderCell>
+                <TableHeaderCell width="w-[185px]">Product Name</TableHeaderCell>
                 <TableHeaderCell width="w-20">Qty</TableHeaderCell>
                 <TableHeaderCell width="w-12">UOM</TableHeaderCell>
-                <TableHeaderCell width="w-24">Rate</TableHeaderCell>
+                <TableHeaderCell width="w-20">Rate</TableHeaderCell>
                 <TableHeaderCell width="w-28">Amount</TableHeaderCell>
+                {showDiscountColumns() && (
+                  <TableHeaderCell width="w-16">Disc %</TableHeaderCell>
+                )}
+                {showDiscountColumns() && (
+                  <TableHeaderCell width="w-20">Spl Disc %</TableHeaderCell>
+                )}
                 <TableHeaderCell width="w-16">HSN</TableHeaderCell>
                 <TableHeaderCell width="w-16">GST %</TableHeaderCell>
                 <TableHeaderCell width="w-20">SGST</TableHeaderCell>
                 <TableHeaderCell width="w-20">CGST</TableHeaderCell>
                 <TableHeaderCell width="w-20">IGST</TableHeaderCell>
-                <TableHeaderCell width="w-20">DL. Date</TableHeaderCell>
-                <TableHeaderCell width="w-28">DL. Mode</TableHeaderCell>
-                <TableHeaderCell width="w-14">Action</TableHeaderCell>
+                <TableHeaderCell width="w-20">DL.Date</TableHeaderCell>
+                <TableHeaderCell width="w-16">DL.Mode</TableHeaderCell>
+                <TableHeaderCell width="w-10">Act</TableHeaderCell>
               </tr>
             </thead>
 
             <tbody>
               {/* Existing Rows */}
               {showRowValueRows &&
-                orderData?.map((row, rowIndex) => (
-                  <TableRow
-                    key={rowIndex}
-                    row={row}
-                    rowIndex={rowIndex}
-                    itemOptions={itemOptions}
-                    handleItemSelect={handleItemSelect}
-                    handleFieldChange={handleFieldChange}
-                    handleRemoveItem={handleRemoveItem}
-                    focusedRateFields={focusedRateFields}
-                    setFocusedRateFields={setFocusedRateFields}
-                    formatCurrency={formatCurrency}
-                    inputRefs={inputRefs}
-                    selectRefs={selectRefs}
-                    totalCols={totalCols}
-                    formResetKey={formResetKey}
-                    handleKeyDownTable={handleKeyDownTable}
-                    handleDateBlur={handleDateBlur}
-                    isDistributorRoute={isDistributorRoute}
-                    isDirectRoute={isDirectRoute}
-                  />
-                ))}
+                orderData?.map((row, rowIndex) => {
+                  // calculate baseindex for this row
+                  const rowBaseIndex = rowIndex * totalCols;
+                  return (
+                    <TableRow
+                      key={rowIndex}
+                      row={row}
+                      rowIndex={rowIndex}
+                      itemOptions={itemOptions}
+                      handleItemSelect={handleItemSelect}
+                      handleFieldChange={handleFieldChange}
+                      handleRemoveItem={handleRemoveItem}
+                      focusedRateFields={focusedRateFields}
+                      setFocusedRateFields={setFocusedRateFields}
+                      formatCurrency={formatCurrency}
+                      inputRefs={inputRefs}
+                      selectRefs={selectRefs}
+                      totalCols={totalCols}
+                      formResetKey={formResetKey}
+                      handleKeyDownTable={handleKeyDownTable}
+                      handleDateBlur={handleDateBlur}
+                      isDistributorOrder={isDistributorOrder}
+                      isDirectOrder={isDirectOrder}
+                      isDistributorReport={isDistributorReport}
+                      isCorporateReport={isCorporateReport}
+                      showDiscountColumns={showDiscountColumns()}
+                      getActualColumnIndex={getActualColumnIndex}
+                      rowBaseIndex={rowBaseIndex}
+                    />
+                  );
+                })}
 
               {/* Editing Row - Always show if showRowValueRows is true */}
               {showRowValueRows && (
@@ -896,19 +856,25 @@ const OrderTable = ({
                   editingRowSelectRef={editingRowSelectRef}
                   editingRowInputRefs={editingRowInputRefs}
                   addButtonRef={addButtonRef}
-                  orderDataLength={orderData?.length || 0}
                   handleDateBlur={handleDateBlur}
                   handleEditingRowKeyDown={handleEditingRowKeyDown}
                   handleAddButtonKeyDown={handleAddButtonKeyDown}
-                  isDistributorRoute={isDistributorRoute}
-                  isDirectRoute={isDirectRoute}
+                  isDistributorOrder={isDistributorOrder}
+                  isDirectOrder={isDirectOrder}
+                  isDistributorReport={isDistributorReport}
+                  isCorporateReport={isCorporateReport}
+                  showDiscountColumns={showDiscountColumns()}
+                  getActualColumnIndex={getActualColumnIndex}
+                  rowIndex={editingRowIndex}
+                  rowBaseIndex={editingRowBaseIndex}
+                  orderData={orderData}
                 />
               )}
 
               {/* If no rows and showRowValueRows is false, show empty state */}
               {!showRowValueRows && (
                 <tr>
-                  <td colSpan={15} className="text-center py-8 text-gray-500">
+                  <td colSpan={17} className="text-center py-8 text-gray-500">
                     No items to display
                   </td>
                 </tr>

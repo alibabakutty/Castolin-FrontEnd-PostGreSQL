@@ -1,5 +1,6 @@
 import { AiFillPlusCircle } from 'react-icons/ai';
 import Select from 'react-select';
+import { tableSelectStyles } from './orderUtils';
 
 const EditingRow = ({
   editingRow,
@@ -13,72 +14,19 @@ const EditingRow = ({
   editingRowSelectRef,
   editingRowInputRefs,
   addButtonRef,
-  orderDataLength,
-  showRowValueRows,
   handleEditingRowKeyDown,
   handleDateBlur,
   handleAddButtonKeyDown,
-  isDistributorRoute,
-  isDirectRoute,
+  isDistributorOrder,
+  isDirectOrder,
+  isDistributorReport,
+  isCorporateReport,
+  showDiscountColumns,
+  getActualColumnIndex,
+  rowIndex,
+  orderData,
+  rowBaseIndex,
 }) => {
-  // Custom styles for table selects
-  const tableSelectStyles = {
-    control: base => ({
-      ...base,
-      minHeight: '24px',
-      height: '24px',
-      lineHeight: '1',
-      padding: '0 1px',
-      width: '100%',
-      backgroundColor: 'white',
-      border: '1px solid #d1d5db',
-      boxShadow: 'none',
-      '&:hover': {
-        borderColor: '#932F67',
-      },
-    }),
-    menu: base => ({
-      ...base,
-      width: '445px',
-      height: '68vh',
-      fontSize: '12px',
-      zIndex: 9999,
-      position: 'absolute',
-    }),
-    menuList: base => ({
-      ...base,
-      maxHeight: '68vh',
-      padding: 0,
-    }),
-    menuPortal: base => ({
-      ...base,
-      zIndex: 9999,
-    }),
-    option: base => ({
-      ...base,
-      padding: '3px 20px',
-      fontSize: '11.5px',
-      fontFamily: 'font-amasis',
-      fontWeight: '600',
-    }),
-    valueContainer: base => ({
-      ...base,
-      padding: '0px 4px',
-      height: '20px',
-    }),
-    input: base => ({
-      ...base,
-      margin: 0,
-      padding: 0,
-      fontSize: '11.5px',
-    }),
-    singleValue: base => ({
-      ...base,
-      fontSize: '11.5px', // Add this for the selected value
-      lineHeight: '1.2',
-    }),
-  };
-
   const handleRateFocus = () => {
     setFocusedRateFields(prev => ({
       ...prev,
@@ -107,16 +55,20 @@ const EditingRow = ({
     }
   };
 
+  // Helper function to handle key down with proper column index
+  const handleKeyDown = (e, colIndex, fieldType = 'input') => {
+    handleEditingRowKeyDown(e, colIndex, fieldType);
+  };
+
   return (
     <tr className="leading-12 bg-yellow-50 hover:bg-yellow-100">
       <td className="border border-gray-400 text-center text-sm w-8 align-middle">
-        {showRowValueRows ? orderData.length + 1 : 1}
+        {orderData.length + 1}
       </td>
 
       {/* Product Code (Select) - Editing Row */}
       <td className="border border-gray-400 text-left text-sm w-24 align-middle p-0.5">
         <Select
-          // key={`editing-select-${formResetKey}`}
           ref={editingRowSelectRef}
           value={editingRow.item}
           options={itemOptions}
@@ -125,7 +77,7 @@ const EditingRow = ({
           }
           getOptionValue={option => option.item_code}
           onChange={selected => handleItemSelect(selected)}
-          // onKeyDown={e => handleEditingRowKeyDown(e, 1, 'select')}
+          // onKeyDown={e => handleKeyDown(e, 1, 'select')}
           placeholder=""
           styles={tableSelectStyles}
           components={{ DropdownIndicator: () => null, IndicatorSeparator: () => null }}
@@ -148,7 +100,7 @@ const EditingRow = ({
           value={editingRow.item?.stock_item_name || ''}
           className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent"
           placeholder=""
-          onKeyDown={e => handleEditingRowKeyDown(e, 2)}
+          onKeyDown={e => handleKeyDown(e, 2)}
         />
       </td>
 
@@ -162,7 +114,7 @@ const EditingRow = ({
           onFocus={e => {
             e.target.setSelectionRange(0, e.target.value.length);
           }}
-          onKeyDown={e => handleEditingRowKeyDown(e, 3)}
+          onKeyDown={e => handleKeyDown(e, 3)}
           className="w-full h-full pl-2 pr-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-right"
           min="0"
           placeholder=""
@@ -177,7 +129,7 @@ const EditingRow = ({
           readOnly
           value={editingRow.item?.uom || "No's"}
           className="w-full h-full text-center focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent"
-          onKeyDown={e => handleEditingRowKeyDown(e, 4)}
+          onKeyDown={e => handleKeyDown(e, 4)}
         />
       </td>
 
@@ -201,7 +153,7 @@ const EditingRow = ({
             }, 10);
           }}
           onBlur={() => handleRateBlur()}
-          onKeyDown={e => handleEditingRowKeyDown(e, 5)}
+          onKeyDown={e => handleKeyDown(e, 5)}
           className="w-full h-full pl-1 pr-2 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-right"
           placeholder=""
         />
@@ -215,9 +167,45 @@ const EditingRow = ({
           readOnly
           value={formatCurrency(editingRow.amount)}
           className="w-full h-full text-right focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent"
-          onKeyDown={e => handleEditingRowKeyDown(e, 6)}
+          onKeyDown={e => handleKeyDown(e, 6)}
         />
       </td>
+
+      {/* Discount - Editing Row */}
+      {showDiscountColumns && (
+        <td className="border border-gray-400 text-sm w-16 align-middle p-0">
+          <input
+            ref={el => (editingRowInputRefs.current.disc = el)}
+            type="text"
+            value={editingRow.disc}
+            onChange={e => handleFieldChange('disc', e.target.value)}
+            onKeyDown={e => handleKeyDown(e, 7)}
+            onFocus={e => {
+              e.target.setSelectionRange(0, e.target.value.length);
+            }}
+            className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-center"
+            placeholder=""
+          />
+        </td>
+      )}
+
+      {/* Special Discount - Editing Row */}
+      {showDiscountColumns && (
+        <td className="border border-gray-400 text-sm w-16 align-middle p-0">
+          <input
+            ref={el => (editingRowInputRefs.current.splDisc = el)}
+            type="text"
+            value={editingRow.splDisc}
+            onChange={e => handleFieldChange('splDisc', e.target.value)}
+            onKeyDown={e => handleKeyDown(e, 8)}
+            onFocus={e => {
+              e.target.setSelectionRange(0, e.target.value.length);
+            }}
+            className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-center"
+            placeholder=""
+          />
+        </td>
+      )}
 
       {/* HSN - Editing Row */}
       <td className="border border-gray-400 text-sm w-16 align-middle p-0">
@@ -226,7 +214,7 @@ const EditingRow = ({
           type="text"
           value={editingRow.hsn}
           onChange={e => handleFieldChange('hsn', e.target.value)}
-          onKeyDown={e => handleEditingRowKeyDown(e, 7)}
+          onKeyDown={e => handleKeyDown(e, 9)}
           className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-center"
           placeholder=""
           readOnly
@@ -240,7 +228,7 @@ const EditingRow = ({
           type="text"
           value={editingRow.gst}
           onChange={e => handleFieldChange('gst', e.target.value)}
-          onKeyDown={e => handleEditingRowKeyDown(e, 8)}
+          onKeyDown={e => handleKeyDown(e, 10)}
           className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-center"
           placeholder=""
           readOnly
@@ -254,7 +242,7 @@ const EditingRow = ({
           type="text"
           value={formatCurrency(editingRow.sgst)}
           onChange={e => handleFieldChange('sgst', e.target.value)}
-          onKeyDown={e => handleEditingRowKeyDown(e, 9)}
+          onKeyDown={e => handleKeyDown(e, 11)}
           className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-center"
           placeholder=""
           readOnly
@@ -268,7 +256,7 @@ const EditingRow = ({
           type="text"
           value={formatCurrency(editingRow.cgst)}
           onChange={e => handleFieldChange('cgst', e.target.value)}
-          onKeyDown={e => handleEditingRowKeyDown(e, 10)}
+          onKeyDown={e => handleKeyDown(e, 12)}
           className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-center"
           placeholder=""
           readOnly
@@ -282,7 +270,7 @@ const EditingRow = ({
           type="text"
           value={formatCurrency(editingRow.igst || 0)}
           onChange={e => handleFieldChange('igst', e.target.value)}
-          onKeyDown={e => handleEditingRowKeyDown(e, 11)}
+          onKeyDown={e => handleKeyDown(e, 13)}
           className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-center"
           placeholder=""
           readOnly
@@ -300,7 +288,7 @@ const EditingRow = ({
             e.target.setSelectionRange(0, e.target.value.length);
           }}
           onBlur={e => handleDateBlur(e)}
-          onKeyDown={e => handleEditingRowKeyDown(e, 12)}
+          onKeyDown={e => handleKeyDown(e, 14)}
           className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-center"
           placeholder=""
         />
@@ -313,7 +301,7 @@ const EditingRow = ({
           type="text"
           value={editingRow.delivery_mode}
           onChange={e => handleFieldChange('delivery_mode', e.target.value)}
-          onKeyDown={e => handleEditingRowKeyDown(e, 13)}
+          onKeyDown={e => handleKeyDown(e, 15)}
           onFocus={e => {
             e.target.setSelectionRange(0, e.target.value.length);
           }}

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../context/authConstants';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { convertToMySQLDate, formatCurrency, generateClientSideOrderNumber } from './orderUtils';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { convertToMySQLDate, formatCurrency, formatDateForInput, generateClientSideOrderNumber, transformOrderData } from './orderUtils';
 import { toast } from 'react-toastify';
 import OrderHeader from './OrderHeader';
 import OrderTable from './OrderTable';
@@ -9,22 +9,41 @@ import OrderFooter from './OrderFooter';
 import api from '../../services/api';
 
 const NewOrder = ({ onBack }) => {
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [customerName, setCustomerName] = useState(null);
+  const { orderNumberFetch } = useParams();
   const [orderNumber, setOrderNumber] = useState('');
-  const [orderData, setOrderData] = useState([]);
-  const [remarks, setRemarks] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [showRowValueRows, setShowRowValueRows] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formResetKey, setFormResetKey] = useState(0);
   const { distributorUser } = useAuth();
+  const navigate = useNavigate();
   const location = useLocation();
+  const isDistributorOrder = location.pathname.includes('/distributor');
+  const isDirectOrder = location.pathname.includes('/corporate');
+  const isCorporateReport = location.pathname.includes('/order-report-corporate');
+  const isDistributorReport = location.pathname.includes('/order-report-distributor');
+  const isApprovedReport = location.pathname.includes('/order-report-approved');
+  const isReportRoute = isCorporateReport || isDistributorReport || isApprovedReport;
+  const mode = isReportRoute || orderNumberFetch ? 'update' : 'create';
+  const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const isDistributorRoute = location.pathname.includes('/distributor');
   const isDirectRoute = location.pathname.includes('/corporate');
   const editingRowSelectRef = useRef(null);
   const customerSelectRef = useRef(null); 
   const addButtonRef = useRef(null);
+  // Header States
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [voucherType, setVoucherType] = useState('Sales Order');
+  const [customerName, setCustomerName] = useState(null);
+  const [executiveName, setExecutiveName] = useState(null);
+  const [remarks, setRemarks] = useState('');
+  const [status, setStatus] = useState('pending');
+  // Order Data States
+  const [orderData, setOrderData] = useState([]);
+  const [originalOrderData, setOriginalOrderData] = useState([]);
+  // check if view only
+  const isViewOnlyReport = location.pathname.includes('order-report-corporate') || 
+  location.pathname.includes('order-report-distributor');
   // Add a new empty row for data entry
   const [editingRow, setEditingRow] = useState({
     item: null,
@@ -33,12 +52,70 @@ const NewOrder = ({ onBack }) => {
     quantity: '',
     rate: '',
     amount: '',
+    disc: '',
+    discAmt: 0,
+    splDisc: '',
+    splDiscAmt: 0,
     hsn: '',
     gst: '',
     sgst: '',
     cgst: '',
     igst: '',
   });
+
+ const handleBackClick = () => {
+  const confirmLeave = window.confirm(
+    mode === 'update'
+      ? 'Do you want to leave without saving changes?'
+      : 'Do you want to leave this order?'
+  );
+
+  if (!confirmLeave) return;
+
+  if (typeof onBack === 'function') {
+    onBack();
+  } else {
+    navigate(-1);
+  }
+};
+
+  // Fetch order details
+  useEffect(() => {
+  if (mode !== 'update') return;
+
+  const fetchOrderDetails = async () => {
+    setLoading(true);
+    try {
+      const response = await api.get(`orders-by-number/${orderNumberFetch}`);
+      const fetchedOrderData = response.data;
+
+      if (fetchedOrderData?.length) {
+        const transformedData = transformOrderData(fetchedOrderData);
+        setOrderData(transformedData);
+        setOriginalOrderData(transformedData);
+
+        const firstItem = fetchedOrderData[0];
+        setVoucherType(firstItem.voucher_type || 'Sales Order');
+        setCustomerName({
+          customer_code: firstItem.customer_code,
+          customer_name: firstItem.customer_name,
+        });
+        setExecutiveName({ customer_name: firstItem.executive });
+        setDate(formatDateForInput(firstItem.created_at));
+        setStatus(firstItem.status || 'pending');
+        setRemarks(firstItem.remarks || '');
+      } else {
+        toast.error('No data found for this order.');
+      }
+    } catch (error) {
+      toast.error('Failed to load order details.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchOrderDetails();
+}, [mode, orderNumberFetch]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -73,27 +150,19 @@ const NewOrder = ({ onBack }) => {
 
   // Initialize order number
   useEffect(() => {
+  if (mode === 'create') {
     const newOrderNumber = generateClientSideOrderNumber();
     setOrderNumber(newOrderNumber);
-  }, [date]);
+  } else {
+    setOrderNumber(orderNumberFetch);
+  }
+}, [mode, date, orderNumberFetch]);
 
   // Handle customer selection
   const handleCustomerSelect = (selected) => {
     setCustomerName(selected);
     setSelectedCustomer(selected);
-    // recalculateGSTForAllItems(selected?.state || '');
   };
-
-  // const isTamilNaduState = useMemo(() => {
-  //   let customerState = '';
-  //   if (isDistributorRoute) {
-  //     customerState = distributorUser?.state = "";
-  //   } else {
-  //     customerState = selectedCustomer?.state || '';
-  //   }
-  //   const normalizedState = customerState.toLowerCase().trim();
-  //   return normalizedState = 'tamil nadu' || normalizedState === 'tn' || normalizedState === 'tamilnadu';
-  // }, [isDistributorRoute, isDirectRoute, selectedCustomer]);
 
   // Handle remarks textarea key events
   const handleRemarksKeyDown = e => {
@@ -120,27 +189,27 @@ const NewOrder = ({ onBack }) => {
   };
 
   // Helper function to check if state is Tamil Nadu
-  const isTamilNaduState = () => {
-    let customerState = '';
-
-    if (isDistributorRoute) {
-      // For distributor route, check distributorUser state
-      customerState = distributorUser?.state || '';
-      console.log('Distributor State:', customerState);
-    } else {
-      // For non-distributor route, check selected customer state
-      customerState = selectedCustomer?.state || '';
-      console.log('Customer State:', customerState);
-    }
-
-    // Normalize the state string for comparison
-    const normalizedState = customerState.toLowerCase().trim();
-    return (
-      normalizedState === 'tamil nadu' ||
-      normalizedState === 'tn' ||
-      normalizedState === 'tamilnadu'
-    );
-  };
+    const isTamilNaduState = () => {
+      let customerState = '';
+  
+      if (isDistributorRoute) {
+        // For distributor route, check distributorUser state
+        customerState = distributorUser?.state || '';
+        console.log('Distributor State:', customerState);
+      } else {
+        // For non-distributor route, check selected customer state
+        customerState = selectedCustomer?.state || '';
+        console.log('Customer State:', customerState);
+      }
+  
+      // Normalize the state string for comparison
+      const normalizedState = customerState.toLowerCase().trim();
+      return (
+        normalizedState === 'tamil nadu' ||
+        normalizedState === 'tn' ||
+        normalizedState === 'tamilnadu'
+      );
+    };
 
   // calculate totals
   const totals = useMemo(() => {
@@ -185,6 +254,114 @@ const NewOrder = ({ onBack }) => {
       };
     }
   }, [orderData, editingRow, isTamilNaduState]);
+
+  const handleDiscChange = (index, value) => {
+    const updatedRows = [...orderData];
+    const row = updatedRows[index];
+
+    const disc = Number(value) || 0;
+    const gross = row.amount;
+    const qty = Number(row.itemQty) || 1;
+
+    const discAmt = (gross * disc) / 100;
+    const splDiscAmt = (gross * (row.splDisc || 0)) / 100;
+    const totalDisc = discAmt + splDiscAmt;
+
+    updatedRows[index].disc = value;
+    updatedRows[index].discAmt = discAmt;
+    updatedRows[index].netRate = qty > 0 ? (gross - totalDisc) / qty : 0;
+    updatedRows[index].grossAmount = gross - totalDisc;
+
+    setOrderData(updatedRows);
+  };
+
+  // Handle special discount changes
+  const handleSplDiscChange = (index, value) => {
+    const updatedRows = [...orderData];
+    const row = updatedRows[index];
+    
+    const splDisc = Number(value) || 0;
+    const gross = row.amount;
+    const qty = Number(row.itemQty) || 1;
+    
+    const discAmt = (gross * (row.disc || 0)) / 100;
+    const splDiscAmt = (gross * splDisc) / 100;
+    const totalDisc = discAmt + splDiscAmt;
+    
+    updatedRows[index].splDisc = value;
+    updatedRows[index].splDiscAmt = splDiscAmt;
+    updatedRows[index].netRate = qty > 0 ? (gross - totalDisc) / qty : 0;
+    updatedRows[index].grossAmount = gross - totalDisc;
+    
+    setOrderData(updatedRows);
+  };
+
+   // Handle quantity changes
+  const handleQuantityChange = (index, value) => {
+    const updatedRows = [...orderData];
+    const row = updatedRows[index];
+    
+    const newQty = Number(value) || 0;
+    const rate = Number(row.rate) || 0;
+    const gross = newQty * rate;
+    
+    const discAmt = (gross * (row.disc || 0)) / 100;
+    const splDiscAmt = (gross * (row.splDisc || 0)) / 100;
+    const totalDisc = discAmt + splDiscAmt;
+    
+    updatedRows[index].itemQty = newQty;
+    updatedRows[index].amount = gross;
+    updatedRows[index].discAmt = discAmt;
+    updatedRows[index].splDiscAmt = splDiscAmt;
+    updatedRows[index].netRate = newQty > 0 ? (gross - totalDisc) / newQty : 0;
+    updatedRows[index].grossAmount = gross - totalDisc;
+    
+    setOrderData(updatedRows);
+  };
+
+  const handlePrimaryAction = e => {
+  if (mode === 'update') {
+    handleUpdate(e);
+  } else {
+    handleSubmit(e);
+  }
+};
+
+  // Handle update (save changes)
+  const handleUpdate = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    
+    try {
+      // Prepare updates
+      const updates = orderData.map(item => ({
+        id: item.id,
+        status: status,
+        disc_percentage: Number(item.disc) || 0,
+        disc_amount: Number(item.discAmt) || 0,
+        spl_disc_percentage: Number(item.splDisc) || 0,
+        spl_disc_amount: Number(item.splDiscAmt) || 0,
+        net_rate: Number(item.netRate) || 0,
+        gross_amount: Number(item.grossAmount) || 0,
+        total_quantity: totals.qty,
+        total_amount: totals.amount,
+        remarks: remarks,
+        quantity: Number(item.itemQty) || 0,
+        delivery_date: convertToMySQLDate(item.delivery_date),
+        delivery_mode: item.delivery_mode,
+      }));
+      
+      await api.put(`/orders-by-number/${orderNumber}`, updates);
+      
+      toast.success('Order updated successfully!');
+      navigate(-1);
+    } catch (error) {
+      console.error('Error updating order:', error);
+      toast.error('Failed to update order.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
  const postOrder = async (payload) => {
   try {
@@ -347,6 +524,9 @@ const handleSubmit = async (e) => {
       spl_disc_percentage: 0,
       spl_disc_amount: 0,
       total_quantity: totals.qty,
+      total_cgst_amount: totals.cgstAmt,
+      total_sgst_amount: totals.sgstAmt,
+      total_igst_amount: totals.igstAmt,
       total_amount: totals.totalAmount,
       remarks: remarks || '',
       row_index: index + 1, // Add row index for reference
@@ -430,7 +610,7 @@ const resetForm = () => {
   return (
     <div className='p-3 bg-amber-50 border-2 h-screen font-amasis'>
       <OrderHeader
-        onBack={onBack}
+        onBack={handleBackClick}
         location={location}
         orderNumber={orderNumber}
         customerName={customerName}
@@ -441,6 +621,10 @@ const resetForm = () => {
         date={date}
         setDate={setDate}
         customerSelectRef={customerSelectRef}
+        voucherType={voucherType}
+        executiveName={executiveName}
+        readOnly={isViewOnlyReport}
+        isDistributorReport={isDistributorReport}
       />
 
       <OrderTable
@@ -448,23 +632,26 @@ const resetForm = () => {
         setOrderData={setOrderData}
         editingRow={editingRow}
         setEditingRow={setEditingRow}
-        selectedCustomer={selectedCustomer}
-        distributorUser={distributorUser}
-        isDistributorRoute={isDistributorRoute}
-        isDirectRoute={isDirectRoute}
         showRowValueRows={showRowValueRows}
         formResetKey={formResetKey}
         editingRowSelectRef={editingRowSelectRef}
+        isTamilNaduState={isTamilNaduState}
+        isViewOnlyReport={isViewOnlyReport}
+        isDistributorOrder={isDistributorOrder}
+        isDirectOrder={isDirectOrder}
+        isDistributorReport={isDistributorReport}
+        isCorporateReport={isCorporateReport}
       />
 
       <OrderFooter
         remarks={remarks}
         setRemarks={setRemarks}
         totals={totals}
-        handleSubmit={handleSubmit}
+        handleSubmit={handlePrimaryAction}
         isSubmitting={isSubmitting}
         formatCurrency={formatCurrency}
         handleRemarksKeyDown={handleRemarksKeyDown}
+        isViewOnlyReport={isViewOnlyReport}
       />
     </div>
   )

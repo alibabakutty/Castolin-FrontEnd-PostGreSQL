@@ -18,7 +18,8 @@ import ViewFetchCorporate from './components/reports-page/ViewFetchCorporate';
 import ViewFetchDistributor from './components/reports-page/ViewFetchDistributor';
 import ViewItemFetchReport from './components/reports-page/ViewItemFetchReport';
 import ViewPendingFetchReport from './components/reports-page/ViewPendingFetchReport';
-import OrderReportPage from './components/reports-page/OrderReportPage';
+import NewOrder from './components/orders-page/NewOrder';
+// import OrderReportPage from './components/reports-page/OrderReportPage';
 
 function App() {
   return (
@@ -147,21 +148,21 @@ function App() {
           </ProtectedRoutes>
         } />
         {/* Approved order report */}
-        <Route path='/order-report-approved/:orderNumber' element={
+        <Route path='/order-report-approved/:orderNumberFetch' element={
           <ProtectedRoutes roles={['admin', 'distributor', 'direct']}>
-            <OrderReportPage />
+            <NewOrder />
           </ProtectedRoutes>
         } />
         {/* Corporate order report */}
-        <Route path='/order-report-corporate/:orderNumber' element={
+        <Route path='/order-report-corporate/:orderNumberFetch' element={
           <ProtectedRoutes roles={['admin', 'distributor', 'direct']}>
-            <OrderReportPage />
+            <NewOrder />
           </ProtectedRoutes>
         } />
         {/* Distributor order report */}
-        <Route path='/order-report-distributor/:orderNumber' element={
+        <Route path='/order-report-distributor/:orderNumberFetch' element={
           <ProtectedRoutes roles={['admin', 'distributor', 'direct']}>
-            <OrderReportPage />
+            <NewOrder />
           </ProtectedRoutes>
         } />
         </Routes>

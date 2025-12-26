@@ -1169,10 +1169,10 @@ const validateFutureDate = dateStr => {
   };
 
   const handleBackClick = () => {
-  const confirmLeave = window.confirm('Do you want to leave this order?');
-  if (!confirmLeave) return;
-  onBack(); // your existing back logic
-};
+    const confirmLeave = window.confirm('Do you want to leave this order?');
+    if (!confirmLeave) return;
+    onBack(); // your existing back logic
+  };
 
 
   // Handler specifically for editing row

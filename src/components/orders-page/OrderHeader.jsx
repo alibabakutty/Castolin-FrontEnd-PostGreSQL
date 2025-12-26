@@ -14,6 +14,9 @@ const OrderHeader = ({
   date,
   setDate,
   customerSelectRef,
+  voucherType,
+  executiveName,
+  isDistributorReport,
 }) => {
   const [customerOptions, setCustomerOptions] = useState([]);
 
@@ -36,7 +39,7 @@ const OrderHeader = ({
   const getVoucherType = () => {
     if (location.pathname.includes('/corporate')) return 'Direct Order Management';
     if (location.pathname.includes('/distributor')) return 'Distributor Order-Web Based';
-    return 'Select Order';
+    return voucherType || 'Sales Quote';
   };
 
   return (
@@ -68,6 +71,7 @@ const OrderHeader = ({
                 ? `${option.customer_code} - ${option.customer_name}`
                 : option.customer_code
             }
+            isDisabled={isDistributorReport}
             styles={{
               control: base => ({
                 ...base,
@@ -152,14 +156,16 @@ const OrderHeader = ({
         </div>
       )}
 
-      <div className={`relative ${isDistributorRoute ? 'w-[450px]' : 'w-[280px]'}`}>
-        <div className="border p-[3.5px] rounded-[5px] border-[#932F67] text-sm font-medium text-gray-700 text-center">
-          {distributorUser.customer_name || 'executive'}
+      {!isDistributorReport && (
+        <div className={`relative ${isDistributorRoute ? 'w-[450px]' : 'w-[280px]'}`}>
+        <div className="border p-[3.5px] rounded-[5px] border-[#932F67] text-sm font-medium text-gray-700 text-center truncate">
+          {distributorUser?.customer_name || executiveName?.customer_name || 'executive'}
         </div>
         <span className="absolute left-2.5 top-[12px] transition-all pointer-events-none -translate-y-[17px] text-[#932F67] px-1.5 font-semibold text-[12px] bg-[#E9EFEC] peer-valid:text-[#932F67] leading-2 rounded">
           {isDistributorRoute ? 'Customer Name' : 'Executive Name'}
         </span>
       </div>
+      )}
 
       {/* Order Date */}
       <FormField
