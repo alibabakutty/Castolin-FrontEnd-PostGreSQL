@@ -1,4 +1,4 @@
-const OrderFooter = ({ remarks, setRemarks, totals, handleSubmit, isSubmitting, formatCurrency, handleRemarksKeyDown }) => {
+const OrderFooter = ({ remarks, setRemarks, totals, handleSubmit, isSubmitting, formatCurrency, handleRemarksKeyDown, isDistributorReport, isCorporateReport }) => {
 
   return (
     <div className="h-[9vh] flex flex-col border-t">
@@ -53,13 +53,15 @@ const OrderFooter = ({ remarks, setRemarks, totals, handleSubmit, isSubmitting, 
       <div className="flex items-center justify-between">
         <div className="flex items-center">
           <div className="mb-0.5 -ml-[-1250px] mr-1">
-            <button
+            {(!isDistributorReport && !isCorporateReport) && (
+              <button
               onClick={handleSubmit}
               disabled={isSubmitting}
               className="bg-[#693382] text-white px-5 rounded-[6px] py-1 outline-none cursor-pointer"
             >
               {isSubmitting ? 'Saving...' : 'Save'}
             </button>
+            )}
           </div>
         </div>
       </div>

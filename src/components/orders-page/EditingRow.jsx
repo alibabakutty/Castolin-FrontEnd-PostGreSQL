@@ -81,6 +81,7 @@ const EditingRow = ({
           placeholder=""
           styles={tableSelectStyles}
           components={{ DropdownIndicator: () => null, IndicatorSeparator: () => null }}
+          isDisabled={isDistributorReport || isCorporateReport}
           formatOptionLabel={(option, { context }) => {
             if (context === 'menu') {
               return option.label || `${option.item_code} - ${option.stock_item_name}`;
@@ -127,7 +128,7 @@ const EditingRow = ({
           ref={el => (editingRowInputRefs.current.uom = el)}
           type="text"
           readOnly
-          value={editingRow.item?.uom || "No's"}
+          value={editingRow.item?.uom || "Nos"}
           className="w-full h-full text-center focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent"
           onKeyDown={e => handleKeyDown(e, 4)}
         />

@@ -100,6 +100,7 @@ const TableRow = ({
             DropdownIndicator: () => null,
             IndicatorSeparator: () => null,
           }}
+          isDisabled={isDistributorReport || isCorporateReport}
           formatOptionLabel={(option, { context }) => {
             if (context === 'menu') {
               return option.label || `${option.item_code} - ${option.stock_item_name}`;
@@ -140,7 +141,7 @@ const TableRow = ({
           }}
           onKeyDown={e => handleKeyDown(e, 3)}
           className="w-full h-full pl-2 pr-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-right"
-          min="0"
+
         />
       </td>
 
@@ -153,7 +154,7 @@ const TableRow = ({
           }}
           type="text"
           readOnly
-          value={row.uom || "No's"}
+          value={row.uom || "Nos"}
           className="w-full h-full text-center focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent"
           onKeyDown={e => handleKeyDown(e, 4)}
         />

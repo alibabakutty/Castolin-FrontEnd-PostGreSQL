@@ -17,6 +17,7 @@ const OrderHeader = ({
   voucherType,
   executiveName,
   isDistributorReport,
+  isCorporateReport,
 }) => {
   const [customerOptions, setCustomerOptions] = useState([]);
 
@@ -71,7 +72,7 @@ const OrderHeader = ({
                 ? `${option.customer_code} - ${option.customer_name}`
                 : option.customer_code
             }
-            isDisabled={isDistributorReport}
+            isDisabled={isDistributorReport || isCorporateReport}
             styles={{
               control: base => ({
                 ...base,

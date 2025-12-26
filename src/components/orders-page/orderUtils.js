@@ -132,10 +132,10 @@ export const convertToMySQLDate = (dateStr) => {
 };
 
 export const formatDateForInput = (dateString) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    return date.toISOString().split('T')[0];
-  };
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  return date.toISOString().split('T')[0];
+};
 
   export const transformOrderData = (apiData) => {
       return apiData.map(item => ({
@@ -155,7 +155,7 @@ export const formatDateForInput = (dateString) => {
         sgst: item.sgst || 0,
         cgst: item.cgst || 0,
         igst: item.igst || 0,
-        delivery_date: item.delivery_date || '',
+        delivery_date: formatPostgresDate(item.delivery_date) || '',
         delivery_mode: item.delivery_mode || '',
         itemQty: item.quantity,
         uom: item.uom,
@@ -236,3 +236,48 @@ export const formatDateForInput = (dateString) => {
     const year = date.getFullYear();
     return `${day}-${month}-${year}`;
   };
+
+  // Format PostgreSQL date to DD-MM-YYYY
+export const formatPostgresDate = (dateString) => {
+  if (!dateString) return '';
+  
+  try {
+    // Handle ISO format (2025-12-26T18:30:00.000Z)
+    if (dateString.includes('T')) {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return dateString;
+      
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}-${month}-${year}`;
+    }
+    
+    // Handle YYYY-MM-DD format
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+      const [year, month, day] = dateString.split('-');
+      return `${day}-${month}-${year}`;
+    }
+    
+    // If already in DD-MM-YYYY format, return as is
+    if (/^\d{2}-\d{2}-\d{4}$/.test(dateString)) {
+      return dateString;
+    }
+    
+    // If in DD/MM/YYYY format
+    if (dateString.includes('/')) {
+      const parts = dateString.split('/');
+      if (parts.length === 3) {
+        const day = parts[0].padStart(2, '0');
+        const month = parts[1].padStart(2, '0');
+        const year = parts[2];
+        return `${day}-${month}-${year}`;
+      }
+    }
+    
+    return dateString;
+  } catch (error) {
+    console.error('Error formatting date:', error, dateString);
+    return dateString;
+  }
+};

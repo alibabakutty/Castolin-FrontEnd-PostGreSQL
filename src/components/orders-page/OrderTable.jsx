@@ -19,6 +19,7 @@ const OrderTable = ({
   isDirectOrder,
   isDistributorReport,
   isCorporateReport,
+  isOrderReportApproved,
 }) => {
   const [itemOptions, setItemOptions] = useState([]);
   const [focusedRateFields, setFocusedRateFields] = useState({
@@ -548,7 +549,7 @@ const OrderTable = ({
             position: 'bottom-right',
             autoClose: 3000,
           });
-        } else if (!validateFutureDate(dateStr)) {
+        } else if (!isOrderReportApproved && !validateFutureDate(dateStr)) {
           shouldPreventNavigation = true;
           toast.error('Delivery date must be today or a future date!', {
             position: 'bottom-right',

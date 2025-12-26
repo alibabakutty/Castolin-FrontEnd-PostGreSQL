@@ -28,6 +28,7 @@ const NewOrder = ({ onBack }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isDistributorRoute = location.pathname.includes('/distributor');
   const isDirectRoute = location.pathname.includes('/corporate');
+  const isOrderReportApproved = location.pathname.includes('/order-report-approved');
   const editingRowSelectRef = useRef(null);
   const customerSelectRef = useRef(null); 
   const addButtonRef = useRef(null);
@@ -327,41 +328,50 @@ const NewOrder = ({ onBack }) => {
   }
 };
 
-  // Handle update (save changes)
-  const handleUpdate = async (e) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    
-    try {
-      // Prepare updates
-      const updates = orderData.map(item => ({
-        id: item.id,
-        status: status,
-        disc_percentage: Number(item.disc) || 0,
-        disc_amount: Number(item.discAmt) || 0,
-        spl_disc_percentage: Number(item.splDisc) || 0,
-        spl_disc_amount: Number(item.splDiscAmt) || 0,
-        net_rate: Number(item.netRate) || 0,
-        gross_amount: Number(item.grossAmount) || 0,
-        total_quantity: totals.qty,
-        total_amount: totals.amount,
-        remarks: remarks,
-        quantity: Number(item.itemQty) || 0,
-        delivery_date: convertToMySQLDate(item.delivery_date),
-        delivery_mode: item.delivery_mode,
-      }));
-      
-      await api.put(`/orders-by-number/${orderNumber}`, updates);
-      
-      toast.success('Order updated successfully!');
-      navigate(-1);
-    } catch (error) {
-      console.error('Error updating order:', error);
-      toast.error('Failed to update order.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  
+  const handleUpdate = async (e) => { 
+    e.preventDefault(); 
+    setIsSubmitting(true); 
+    try { 
+     const updates = orderData.map(
+      item => ({ 
+        id: item.id, 
+        status: status, 
+        disc_percentage: Number(item.disc) || 0, 
+        disc_amount: Number(item.discAmt) || 0, 
+        spl_disc_percentage: Number(item.splDisc) || 0, 
+        spl_disc_amount: Number(item.splDiscAmt) || 0, 
+        net_rate: Number(item.netRate) || 0, 
+        gross_amount: Number(item.grossAmount) || 0, 
+        quantity: Number(item.itemQty) || 0, 
+        gst: Number(item.gst || 0), 
+        sgst: Number(item.sgst || 0), 
+        cgst: Number(item.cgst || 0), 
+        igst: Number(item.igst || 0), 
+        hsn: item.hsn || '', 
+        rate: Number(item.rate || 0), 
+        amount: Number(item.amount || 0), 
+        uom: item.uom || '', 
+        delivery_date: convertToMySQLDate(item.delivery_date), 
+        delivery_mode: item.delivery_mode || '', 
+        total_quantity: totals.qty, 
+        total_amount: totals.totalAmount, 
+        total_sgst_amount: totals.sgstAmt, 
+        total_cgst_amount: totals.cgstAmt, 
+        total_igst_amount: totals.igstAmt, 
+        remarks: remarks || '', 
+      })); 
+      // Log for debugging 
+      console.log('Sending update for order:', orderNumber); 
+      console.log('Update payload sample:', updates[0]); 
+      console.log('Totals:', { total_quantity: totals.qty, total_amount: totals.totalAmount, total_sgst_amount: totals.sgstAmt, total_cgst_amount: totals.cgstAmt, total_igst_amount: totals.igstAmt, }); 
+      const response = await api.put(`/orders-by-number/${orderNumber}`, updates); 
+      console.log('Update response:', response.data); 
+      toast.success('Order updated successfully!'); navigate(-1); 
+    } catch (error) { 
+      console.error('Error updating order:', error); 
+      console.error('Error details:', error.response?.data); 
+    } finally { setIsSubmitting(false); } };
 
  const postOrder = async (payload) => {
   try {
@@ -619,12 +629,13 @@ const resetForm = () => {
         distributorUser={distributorUser}
         isDistributorRoute={isDistributorRoute}
         date={date}
-        setDate={setDate}
+        setDate={setDate} 
         customerSelectRef={customerSelectRef}
         voucherType={voucherType}
         executiveName={executiveName}
         readOnly={isViewOnlyReport}
         isDistributorReport={isDistributorReport}
+        isCorporateReport={isCorporateReport}
       />
 
       <OrderTable
@@ -641,6 +652,7 @@ const resetForm = () => {
         isDirectOrder={isDirectOrder}
         isDistributorReport={isDistributorReport}
         isCorporateReport={isCorporateReport}
+        isOrderReportApproved={isOrderReportApproved}
       />
 
       <OrderFooter
@@ -652,6 +664,8 @@ const resetForm = () => {
         formatCurrency={formatCurrency}
         handleRemarksKeyDown={handleRemarksKeyDown}
         isViewOnlyReport={isViewOnlyReport}
+        isDistributorReport={isDistributorReport}
+        isCorporateReport={isCorporateReport}
       />
     </div>
   )
