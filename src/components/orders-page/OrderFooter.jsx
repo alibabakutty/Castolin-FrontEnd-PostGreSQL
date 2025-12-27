@@ -1,5 +1,14 @@
-const OrderFooter = ({ remarks, setRemarks, totals, handleSubmit, isSubmitting, formatCurrency, handleRemarksKeyDown, isDistributorReport, isCorporateReport }) => {
-
+const OrderFooter = ({
+  remarks,
+  setRemarks,
+  totals,
+  handleSubmit,
+  isSubmitting,
+  formatCurrency,
+  handleRemarksKeyDown,
+  isDistributorReport,
+  isCorporateReport,
+}) => {
   return (
     <div className="h-[9vh] flex flex-col border-t">
       {/* First row */}
@@ -27,11 +36,11 @@ const OrderFooter = ({ remarks, setRemarks, totals, handleSubmit, isSubmitting, 
               </div>
             </div>
           </div>
-          
+
           <div className="">
             <p className="font-medium mt-1.5">:</p>
           </div>
-          
+
           <div className="w-[1000px] px-0.5 py-1">
             <table className="w-full border-b mb-1">
               <tfoot>
@@ -48,19 +57,19 @@ const OrderFooter = ({ remarks, setRemarks, totals, handleSubmit, isSubmitting, 
           </div>
         </div>
       </div>
-      
+
       {/* Second row - Save button */}
       <div className="flex items-center justify-between">
         <div className="flex items-center">
           <div className="mb-0.5 -ml-[-1250px] mr-1">
-            {(!isDistributorReport && !isCorporateReport) && (
+            {!isDistributorReport && !isCorporateReport && (
               <button
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-              className="bg-[#693382] text-white px-5 rounded-[6px] py-1 outline-none cursor-pointer"
-            >
-              {isSubmitting ? 'Saving...' : 'Save'}
-            </button>
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                className="bg-[#693382] text-white px-5 rounded-[6px] py-1 outline-none cursor-pointer"
+              >
+                {isSubmitting ? 'Saving...' : 'Save'}
+              </button>
             )}
           </div>
         </div>
@@ -69,10 +78,6 @@ const OrderFooter = ({ remarks, setRemarks, totals, handleSubmit, isSubmitting, 
   );
 };
 
-const FooterCell = ({ children }) => (
-  <td className="text-right border w-20 px-1">
-    {children}
-  </td>
-);
+const FooterCell = ({ children }) => <td className="text-right border w-20 px-1">{children}</td>;
 
 export default OrderFooter;
