@@ -31,7 +31,7 @@ const OrderTable = ({
   const editingRowInputRefs = useRef({});
   const addButtonRef = useRef(null);
   const navigate = useNavigate();
-  
+
   // Calculate total columns based on order type
   const totalCols = isDistributorOrder
     ? 15
@@ -42,7 +42,7 @@ const OrderTable = ({
     : isCorporateReport
     ? 15
     : 17;
-  
+
   const actionColumnIndex = isDistributorOrder
     ? 16
     : isDirectOrder
@@ -51,7 +51,7 @@ const OrderTable = ({
     ? 16
     : isCorporateReport
     ? 16
-    : 16;
+    : 17;
 
   // Helper function to check if discount columns are visible
   const showDiscountColumns = () => {
@@ -59,7 +59,7 @@ const OrderTable = ({
   };
 
   // Map logical column index to actual display column index
-  const getActualColumnIndex = (logicalIndex) => {
+  const getActualColumnIndex = logicalIndex => {
     if (showDiscountColumns()) {
       // All columns are visible
       return logicalIndex;
@@ -78,16 +78,16 @@ const OrderTable = ({
   // Get next visible column for keyboard navigation
   const getNextVisibleColumn = (currentIndex, direction = 1) => {
     let nextIndex = currentIndex + direction;
-    
+
     // Skip columns that don't exist based on order type
     while (!showDiscountColumns() && (nextIndex === 7 || nextIndex === 8)) {
       nextIndex += direction;
     }
-    
+
     // Make sure we stay within bounds
     if (nextIndex < 1) nextIndex = 1;
     if (nextIndex > actionColumnIndex) nextIndex = actionColumnIndex;
-    
+
     return nextIndex;
   };
 
@@ -108,22 +108,139 @@ const OrderTable = ({
     fetchStockItems();
   }, []);
 
-  // Calculate GST for a row
+  // Calculate GST for a row with proper discount calculations
   const calculateGSTForRow = useCallback(
-    (row, amount) => {
-      const gstPercentage = Number(row.gst || 18);
-      const gstAmount = amount * (gstPercentage / 100);
+    (row, baseAmount, discountsApplied = false, preserveGSTType = false) => {
+      console.log('Calculating GST for row - START:', {
+        row: { ...row },
+        baseAmount,
+        discountsApplied,
+        preserveGSTType,
+      });
 
-      if (isTamilNaduState()) {
+      let taxableAmount = baseAmount;
+      let discAmt = 0;
+      let splDiscAmt = 0;
+
+      // Apply discounts if percentages are provided
+      if (discountsApplied) {
+        const discPercentage = parseFloat(row.disc || 0);
+        const splDiscPercentage = parseFloat(row.splDisc || 0);
+
+        // Calculate total discount percentage
+        const totalDiscountPercentage = discPercentage + splDiscPercentage;
+
+        // Calculate regular discount (on base amount)
+        if (discPercentage > 0) {
+          discAmt = (baseAmount * discPercentage) / 100;
+          row.discAmt = discAmt.toFixed(2);
+        } else {
+          row.discAmt = '0';
+        }
+
+        // Calculate special discount (also on base amount, not sequential)
+        if (splDiscPercentage > 0) {
+          splDiscAmt = (baseAmount * splDiscPercentage) / 100;
+          row.splDiscAmt = splDiscAmt.toFixed(2);
+        } else {
+          row.splDiscAmt = '0';
+        }
+
+        // Total discount amount
+        const totalDiscount = discAmt + splDiscAmt;
+
+        // Apply total discount to base amount
+        taxableAmount = baseAmount - totalDiscount;
+
+        console.log('Discount Calculation:', {
+          baseAmount,
+          discPercentage: discPercentage + '%',
+          discAmt,
+          splDiscPercentage: splDiscPercentage + '%',
+          splDiscAmt,
+          totalDiscountPercentage: totalDiscountPercentage + '%',
+          totalDiscount,
+          taxableAmount,
+        });
+      } else {
+        row.discAmt = '0';
+        row.splDiscAmt = '0';
+      }
+
+      // Calculate net rate per unit and gross amount
+      const qty = parseFloat(row.itemQty || row.quantity || 0);
+      if (qty > 0) {
+        // Net rate = taxable amount per unit
+        row.netRate = (taxableAmount / qty).toFixed(2);
+      } else {
+        row.netRate = '0';
+      }
+      // Gross amount = taxable amount (amount after all discounts)
+      row.grossAmount = taxableAmount.toFixed(2);
+
+      // Calculate GST on the discounted amount (taxableAmount)
+      const gstPercentage = parseFloat(row.gst || 18);
+      const gstAmount = taxableAmount * (gstPercentage / 100);
+
+      // Check if we should preserve the existing GST type
+      const hasExistingSGST = parseFloat(row.sgst || 0) > 0;
+      const hasExistingCGST = parseFloat(row.cgst || 0) > 0;
+      const hasExistingIGST = parseFloat(row.igst || 0) > 0;
+
+      if (preserveGSTType && (hasExistingSGST || hasExistingCGST || hasExistingIGST)) {
+        // Preserve existing GST type
+        if (hasExistingSGST || hasExistingCGST) {
+          // Split GST amount equally between SGST and CGST
+          const halfGST = gstAmount / 2;
+          row.sgst = halfGST.toFixed(2);
+          row.cgst = halfGST.toFixed(2);
+          row.igst = '0';
+        } else if (hasExistingIGST) {
+          // Use IGST
+          row.sgst = '0';
+          row.cgst = '0';
+          row.igst = gstAmount.toFixed(2);
+        }
+      } else if (isTamilNaduState()) {
+        // Tamil Nadu - SGST + CGST (half each)
         const halfGST = gstAmount / 2;
         row.sgst = halfGST.toFixed(2);
         row.cgst = halfGST.toFixed(2);
         row.igst = '0';
       } else {
+        // Other states (including admin) - IGST
         row.sgst = '0';
         row.cgst = '0';
         row.igst = gstAmount.toFixed(2);
       }
+
+      // Calculate final amount (discounted amount + GST)
+      const finalAmount = taxableAmount + gstAmount;
+      row.amount = finalAmount.toFixed(2);
+
+      console.log('Calculating GST for row - FINAL RESULTS:', {
+        baseAmount,
+        taxableAmount,
+        discAmt,
+        splDiscAmt,
+        totalDiscount: discAmt + splDiscAmt,
+        gstAmount,
+        finalAmount,
+        sgst: row.sgst,
+        cgst: row.cgst,
+        igst: row.igst,
+        amount: row.amount,
+        netRate: row.netRate,
+        grossAmount: row.grossAmount,
+      });
+
+      return {
+        taxableAmount,
+        discAmt,
+        splDiscAmt,
+        gstAmount,
+        finalAmount,
+      };
     },
     [isTamilNaduState],
   );
@@ -138,83 +255,61 @@ const OrderTable = ({
           rate: selected?.rate || '',
           hsn: selected?.hsn_code || selected?.hsn || '',
           gst: selected?.gst || '18',
-          sgst: '', // Will calculate based on state
-          cgst: '', // Will calculate based on state
-          igst: '', // Will calculate based on state
+          sgst: '',
+          cgst: '',
+          igst: '',
+          disc: prev.disc || '0',
+          splDisc: prev.splDisc || '0',
         };
 
         if (prev.quantity && selected?.rate) {
-          const amount = (Number(prev.quantity) || 0) * (Number(selected.rate) || 0);
-          updated.amount = amount;
-
-          // Check if state is Tamil Nadu
-          if (isTamilNaduState()) {
-            // Calculate SGST and CGST for Tamil Nadu
-            const gstPercentage = Number(selected?.gst || 18);
-            const gstAmount = amount * (gstPercentage / 100);
-            const halfGST = gstAmount / 2;
-            updated.sgst = halfGST.toFixed(2);
-            updated.cgst = halfGST.toFixed(2);
-            updated.igst = 0; // Clear IGST
-          } else {
-            // Calculate IGST for other states
-            const gstPercentage = Number(selected?.gst || 18);
-            const gstAmount = amount * (gstPercentage / 100);
-            updated.sgst = ''; // Clear SGST
-            updated.cgst = ''; // Clear CGST
-            updated.igst = gstAmount.toFixed(2);
-          }
+          const baseAmount = (Number(prev.quantity) || 0) * (Number(selected.rate) || 0);
+          // For editing row, don't preserve GST type
+          calculateGSTForRow(updated, baseAmount, true, false);
         }
 
         return updated;
       });
 
-      // After selecting item, focus on quantity field
       setTimeout(() => {
         editingRowInputRefs.current.quantity?.focus();
       }, 50);
     } else {
       // For existing rows
       const updatedRows = [...orderData];
-      updatedRows[index].item = selected;
-      updatedRows[index].itemCode = selected?.item_code || '';
-      updatedRows[index].itemName = selected?.stock_item_name || '';
-      updatedRows[index].rate = selected?.rate || '';
-      updatedRows[index].hsn = selected?.hsn_code || selected?.hsn || '';
-      updatedRows[index].gst = selected?.gst || '18';
-      updatedRows[index].sgst = '';
-      updatedRows[index].cgst = '';
-      updatedRows[index].igst = '';
-      updatedRows[index].uom = selected?.uom || 'Nos';
+      const row = updatedRows[index];
 
-      if (updatedRows[index].itemQty && selected?.rate) {
-        const amount = (Number(updatedRows[index].itemQty) || 0) * (Number(selected.rate) || 0);
-        updatedRows[index].amount = amount;
+      // Store original GST values
+      const originalSgst = row.sgst;
+      const originalCgst = row.cgst;
+      const originalIgst = row.igst;
 
-        // Check if state is Tamil Nadu
-        if (isTamilNaduState()) {
-          // Calculate SGST and CGST for Tamil Nadu
-          const gstPercentage = Number(selected?.gst || 18);
-          const gstAmount = amount * (gstPercentage / 100);
-          const halfGST = gstAmount / 2;
-          updatedRows[index].sgst = halfGST.toFixed(2);
-          updatedRows[index].cgst = halfGST.toFixed(2);
-          updatedRows[index].igst = 0; // Clear IGST
-        } else {
-          // Calculate IGST for other states
-          const gstPercentage = Number(selected?.gst || 18);
-          const gstAmount = amount * (gstPercentage / 100);
-          updatedRows[index].sgst = ''; // Clear SGST
-          updatedRows[index].cgst = ''; // Clear CGST
-          updatedRows[index].igst = gstAmount.toFixed(2);
-        }
+      row.item = selected;
+      row.itemCode = selected?.item_code || '';
+      row.itemName = selected?.stock_item_name || '';
+      row.rate = selected?.rate || '';
+      row.hsn = selected?.hsn_code || selected?.hsn || '';
+      row.gst = selected?.gst || '18';
+      row.uom = selected?.uom || 'Nos';
+      row.disc = row.disc || '0';
+      row.splDisc = row.splDisc || '0';
+
+      if (row.itemQty && selected?.rate) {
+        const baseAmount = (Number(row.itemQty) || 0) * (Number(selected.rate) || 0);
+
+        // Check if we should preserve GST type
+        const shouldPreserveGST =
+          parseFloat(originalSgst || 0) > 0 ||
+          parseFloat(originalCgst || 0) > 0 ||
+          parseFloat(originalIgst || 0) > 0;
+
+        calculateGSTForRow(row, baseAmount, true, shouldPreserveGST);
       }
 
       setOrderData(updatedRows);
 
-      // After selecting item, focus on quantity field
       setTimeout(() => {
-        const actualColIndex = getActualColumnIndex(3); // Quantity is column 3
+        const actualColIndex = getActualColumnIndex(3);
         if (actualColIndex !== -1) {
           const quantityIndex = index * totalCols + actualColIndex;
           inputRefs.current[quantityIndex]?.focus();
@@ -223,7 +318,50 @@ const OrderTable = ({
     }
   };
 
-  // Handle field changes
+  // Function to apply default discounts (for admin users)
+  const applyDefaultDiscounts = useCallback(
+    (row, defaultDiscount = 0, defaultSplDiscount = 0) => {
+      if (!row.itemQty || !row.rate) return row;
+
+      const qty = Number(row.itemQty);
+      const rate = Number(row.rate);
+      const amt = qty * rate;
+
+      const discAmt = (amt * defaultDiscount) / 100;
+      const splDiscAmt = ((amt - discAmt) * defaultSplDiscount) / 100;
+      const totalDisc = discAmt + splDiscAmt;
+
+      row.disc = defaultDiscount.toString();
+      row.discAmt = discAmt.toFixed(2);
+      row.splDisc = defaultSplDiscount.toString();
+      row.splDiscAmt = splDiscAmt.toFixed(2);
+      row.netRate = ((amt - totalDisc) / qty).toFixed(2);
+      row.grossAmount = (amt - totalDisc).toFixed(2);
+
+      // Recalculate GST with new discounted amount
+      const taxableAmount = amt - totalDisc;
+      const gstPercentage = Number(row.gst || 18);
+      const gstAmount = taxableAmount * (gstPercentage / 100);
+
+      if (isTamilNaduState()) {
+        const halfGST = gstAmount / 2;
+        row.sgst = halfGST.toFixed(2);
+        row.cgst = halfGST.toFixed(2);
+        row.igst = '0';
+      } else {
+        row.sgst = '0';
+        row.cgst = '0';
+        row.igst = gstAmount.toFixed(2);
+      }
+
+      row.amount = (taxableAmount + gstAmount).toFixed(2);
+
+      return row;
+    },
+    [isTamilNaduState],
+  );
+
+  // Handle field changes including discounts
   const handleFieldChange = useCallback(
     (field, value, index) => {
       if (index === undefined) {
@@ -231,13 +369,21 @@ const OrderTable = ({
         setEditingRow(prev => {
           const updated = { ...prev, [field]: value };
 
-          if (field === 'quantity' || field === 'rate' || field === 'gst') {
+          // If any of these fields change, recalculate everything
+          if (
+            field === 'quantity' ||
+            field === 'rate' ||
+            field === 'gst' ||
+            field === 'disc' ||
+            field === 'splDisc'
+          ) {
             const qty = field === 'quantity' ? value : prev.quantity;
             const rate = field === 'rate' ? value : prev.rate;
-            const rateNum = field === 'rate' ? parseFloat(value) || 0 : parseFloat(prev.rate) || 0;
-            const amount = (parseFloat(qty) || 0) * rateNum;
-            updated.amount = amount;
-            calculateGSTForRow(updated, amount);
+
+            const baseAmount = (parseFloat(qty) || 0) * (parseFloat(rate) || 0);
+
+            // For editing row, don't preserve GST type (start fresh)
+            calculateGSTForRow(updated, baseAmount, true, false);
           }
 
           return updated;
@@ -245,15 +391,43 @@ const OrderTable = ({
       } else {
         // For existing rows
         const updatedRows = [...orderData];
-        updatedRows[index][field] = value;
+        const row = updatedRows[index];
 
-        if (field === 'itemQty' || field === 'rate' || field === 'gst') {
-          const qty = field === 'itemQty' ? value : updatedRows[index].itemQty;
-          const rate = field === 'rate' ? value : updatedRows[index].rate;
-          const rateNum = parseFloat(rate) || 0;
-          const amount = (parseFloat(qty) || 0) * rateNum;
-          updatedRows[index].amount = amount;
-          calculateGSTForRow(updatedRows[index], amount);
+        // Store original GST values before change
+        const originalSgst = row.sgst;
+        const originalCgst = row.cgst;
+        const originalIgst = row.igst;
+
+        // Update the field
+        if (field === 'itemQty') {
+          row.itemQty = value;
+        } else if (field === 'quantity') {
+          row.itemQty = value; // Handle both field names
+        } else {
+          row[field] = value;
+        }
+
+        // If any of these fields change, recalculate everything
+        if (
+          field === 'itemQty' ||
+          field === 'quantity' ||
+          field === 'rate' ||
+          field === 'gst' ||
+          field === 'disc' ||
+          field === 'splDisc'
+        ) {
+          const qty = parseFloat(row.itemQty || 0);
+          const rate = parseFloat(row.rate || 0);
+
+          const baseAmount = qty * rate;
+
+          // For existing rows, preserve GST type if they already have values
+          const shouldPreserveGST =
+            parseFloat(originalSgst || 0) > 0 ||
+            parseFloat(originalCgst || 0) > 0 ||
+            parseFloat(originalIgst || 0) > 0;
+
+          calculateGSTForRow(row, baseAmount, true, shouldPreserveGST);
         }
 
         setOrderData(updatedRows);
@@ -277,7 +451,6 @@ const OrderTable = ({
         position: 'bottom-right',
         autoClose: 3000,
       });
-      // Focus on quantity field
       setTimeout(() => {
         editingRowInputRefs.current.quantity?.focus();
       }, 100);
@@ -291,7 +464,6 @@ const OrderTable = ({
         position: 'bottom-right',
         autoClose: 3000,
       });
-      // Focus on quantity field
       setTimeout(() => {
         editingRowInputRefs.current.quantity?.focus();
       }, 100);
@@ -303,7 +475,6 @@ const OrderTable = ({
         position: 'bottom-right',
         autoClose: 3000,
       });
-      // Focus on delivery date field
       setTimeout(() => {
         editingRowInputRefs.current.delivery_date?.focus();
       }, 100);
@@ -315,36 +486,49 @@ const OrderTable = ({
         position: 'bottom-right',
         autoClose: 3000,
       });
-      // Focus on delivery mode field
       setTimeout(() => {
         editingRowInputRefs.current.delivery_mode?.focus();
       }, 100);
       return;
     }
 
-    // Ensure rate is a number
+    // Calculate base amount
     const rateValue = parseFloat(editingRow.rate) || 0;
+    const baseAmount = rateValue * quantityNum;
+
+    // Create a copy of editing row and calculate everything
+    const finalRow = { ...editingRow };
+    calculateGSTForRow(finalRow, baseAmount, true, false);
 
     const newRow = {
       item: editingRow.item,
       itemCode: editingRow.item.item_code,
       itemName: editingRow.item.stock_item_name,
-      disc: editingRow.disc,
-      splDisc: editingRow.splDisc,
-      hsn: editingRow.hsn,
-      gst: editingRow.gst,
-      sgst: editingRow.sgst,
-      cgst: editingRow.cgst,
-      igst: editingRow.igst,
+      disc: editingRow.disc || '0',
+      discAmt: parseFloat(finalRow.discAmt) || 0,
+      splDisc: editingRow.splDisc || '0',
+      splDiscAmt: parseFloat(finalRow.splDiscAmt) || 0,
+      hsn: editingRow.hsn || editingRow.item.hsn_code || '',
+      gst: editingRow.gst || '18',
+      sgst: parseFloat(finalRow.sgst) || 0,
+      cgst: parseFloat(finalRow.cgst) || 0,
+      igst: parseFloat(finalRow.igst) || 0,
       delivery_date: editingRow.delivery_date,
       delivery_mode: editingRow.delivery_mode,
-      itemQty: quantityNum, // Use the parsed number
+      itemQty: quantityNum,
       uom: editingRow.item.uom || 'Nos',
       rate: rateValue,
-      amount: rateValue * quantityNum,
-      netRate: rateValue,
-      grossAmount: rateValue * quantityNum,
+      amount: parseFloat(finalRow.amount) || 0,
+      netRate: parseFloat(finalRow.netRate) || 0,
+      grossAmount: parseFloat(finalRow.grossAmount) || 0,
     };
+
+    console.log('Adding new row with GST type:', {
+      sgst: newRow.sgst,
+      cgst: newRow.cgst,
+      igst: newRow.igst,
+      isTamilNaduState: isTamilNaduState(),
+    });
 
     setOrderData(prev => [...prev, newRow]);
 
@@ -357,12 +541,16 @@ const OrderTable = ({
       rate: '',
       amount: '',
       disc: '',
+      discAmt: 0,
       splDisc: '',
+      splDiscAmt: 0,
       hsn: '',
       gst: '',
       sgst: '',
       cgst: '',
       igst: '',
+      netRate: '',
+      grossAmount: '',
     });
 
     // Focus on the new editing row's select
@@ -429,7 +617,7 @@ const OrderTable = ({
     const totalRows = orderData.length + 1; // +1 for editing row
 
     // Helper function to get actual column index considering hidden columns
-    const getActualColIndex = (logicalIndex) => {
+    const getActualColIndex = logicalIndex => {
       if (!showDiscountColumns() && (logicalIndex === 7 || logicalIndex === 8)) {
         return -1; // These columns don't exist
       }
@@ -439,27 +627,27 @@ const OrderTable = ({
     // Helper function to get next logical column index (considering hidden columns)
     const getNextLogicalColumn = (currentIndex, direction = 1) => {
       let nextIndex = currentIndex + direction;
-      
+
       // Skip hidden columns
       while (!showDiscountColumns() && (nextIndex === 7 || nextIndex === 8)) {
         nextIndex += direction;
       }
-      
+
       // Make sure we stay within bounds
       if (nextIndex < 1) nextIndex = 1;
       if (nextIndex > actionColumnIndex) nextIndex = actionColumnIndex;
-      
+
       return nextIndex;
     };
 
     // Helper function to check if column exists
-    const columnExists = (col) => {
+    const columnExists = col => {
       const actualIndex = getActualColIndex(col);
       return actualIndex !== -1;
     };
 
     // Helper function to focus on editing row element
-    const focusEditingRow = (colIndex) => {
+    const focusEditingRow = colIndex => {
       if (colIndex === 1) {
         // Product Code (Select)
         editingRowSelectRef.current?.focus();
@@ -482,13 +670,13 @@ const OrderTable = ({
           14: 'delivery_date',
           15: 'delivery_mode',
         };
-        
+
         // Add discount fields only if visible
         if (showDiscountColumns()) {
           fieldMap[7] = 'disc';
           fieldMap[8] = 'splDisc';
         }
-        
+
         const field = fieldMap[colIndex];
         if (field && editingRowInputRefs.current[field]) {
           editingRowInputRefs.current[field].focus();
@@ -500,8 +688,8 @@ const OrderTable = ({
     const focusExistingRow = (rowIndex, colIndex) => {
       const actualColIndex = getActualColumnIndex(colIndex);
       if (actualColIndex !== -1) {
-        const refIndex = (rowIndex * totalCols) + actualColIndex;
-        
+        const refIndex = rowIndex * totalCols + actualColIndex;
+
         if (colIndex === 1) {
           // Product Code (Select)
           selectRefs.current[refIndex]?.focus();
@@ -526,7 +714,7 @@ const OrderTable = ({
     const moveToNextCell = () => {
       // Get current row data
       const currentRowData = rowIndex === totalRows - 1 ? editingRow : orderData[rowIndex];
-      
+
       // Check validation based on current column
       let shouldPreventNavigation = false;
 
@@ -549,7 +737,12 @@ const OrderTable = ({
             position: 'bottom-right',
             autoClose: 3000,
           });
-        } else if (!isOrderReportApproved && !isDistributorReport && !isCorporateReport && !validateFutureDate(dateStr)) {
+        } else if (
+          !isOrderReportApproved &&
+          !isDistributorReport &&
+          !isCorporateReport &&
+          !validateFutureDate(dateStr)
+        ) {
           shouldPreventNavigation = true;
           toast.error('Delivery date must be today or a future date!', {
             position: 'bottom-right',
@@ -584,7 +777,7 @@ const OrderTable = ({
       if (nextCol > actionColumnIndex) {
         nextRow += 1;
         nextCol = 1; // Start with first column (Product Code select)
-        
+
         // Skip hidden columns
         while (!showDiscountColumns() && (nextCol === 7 || nextCol === 8)) {
           nextCol += 1;
@@ -757,7 +950,7 @@ const OrderTable = ({
         setTimeout(() => {
           const actualColIndex = getActualColumnIndex(deliveryModeCol);
           if (actualColIndex !== -1) {
-            const refIndex = (prevRowIndex * totalCols) + actualColIndex;
+            const refIndex = prevRowIndex * totalCols + actualColIndex;
             inputRefs.current[refIndex]?.focus();
           }
         }, 0);
@@ -791,9 +984,7 @@ const OrderTable = ({
                 <TableHeaderCell width="w-12">UOM</TableHeaderCell>
                 <TableHeaderCell width="w-20">Rate</TableHeaderCell>
                 <TableHeaderCell width="w-28">Amount</TableHeaderCell>
-                {showDiscountColumns() && (
-                  <TableHeaderCell width="w-16">Disc %</TableHeaderCell>
-                )}
+                {showDiscountColumns() && <TableHeaderCell width="w-16">Disc %</TableHeaderCell>}
                 {showDiscountColumns() && (
                   <TableHeaderCell width="w-20">Spl Disc %</TableHeaderCell>
                 )}

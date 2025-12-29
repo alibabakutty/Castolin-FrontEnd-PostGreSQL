@@ -1,166 +1,196 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useAuth } from '../../context/authConstants';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { convertToMySQLDate, formatCurrency, formatDateForInput, generateClientSideOrderNumber, transformOrderData } from './orderUtils';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useParams } from 'react-router-dom';
+import {
+  convertToMySQLDate,
+  formatCurrency,
+  formatDateForInput,
+  generateClientSideOrderNumber,
+  transformOrderData,
+} from './orderUtils';
 import { toast } from 'react-toastify';
 import OrderHeader from './OrderHeader';
 import OrderTable from './OrderTable';
 import OrderFooter from './OrderFooter';
 import api from '../../services/api';
+import { useOrderFormHook } from './useOrderFormHook';
 
 const NewOrder = ({ onBack }) => {
   const { orderNumberFetch } = useParams();
-  const [orderNumber, setOrderNumber] = useState('');
-  const [selectedCustomer, setSelectedCustomer] = useState(null);
-  const [showRowValueRows, setShowRowValueRows] = useState(true);
-  const [formResetKey, setFormResetKey] = useState(0);
-  const { distributorUser } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
+
+  // Use the custom hook
+  const {
+    date,
+    setDate,
+    customerName,
+    setCustomerName,
+    orderNumber,
+    setOrderNumber,
+    orderData,
+    setOrderData,
+    remarks,
+    setRemarks,
+    selectedCustomer,
+    setSelectedCustomer,
+    showRowValueRows,
+    setShowRowValueRows,
+    originalOrderData,
+    setOriginalOrderData,
+    editingRow,
+    setEditingRow,
+    voucherType,
+    setVoucherType,
+    executiveName,
+    setExecutiveName,
+    status,
+    setStatus,
+    loading,
+    setLoading,
+    isSubmitting,
+    setIsSubmitting,
+    formResetKey,
+    setFormResetKey,
+    distributorUser,
+    isDistributorRoute,
+    isDirectRoute,
+    isCorporateReport,
+    isDistributorReport,
+    isApprovedReport,
+    isReportRoute,
+    isViewOnlyReport,
+    location,
+    navigate,
+    dbTotals,
+    setDbTotals,
+    userRole,
+    isTamilNaduState: hooksIsTamilNaduState,
+  } = useOrderFormHook(onBack);
+
   const isDistributorOrder = location.pathname.includes('/distributor');
   const isDirectOrder = location.pathname.includes('/corporate');
-  const isCorporateReport = location.pathname.includes('/order-report-corporate');
-  const isDistributorReport = location.pathname.includes('/order-report-distributor');
-  const isApprovedReport = location.pathname.includes('/order-report-approved');
-  const isReportRoute = isCorporateReport || isDistributorReport || isApprovedReport;
-  const mode = isReportRoute || orderNumberFetch ? 'update' : 'create';
-  const [loading, setLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const isDistributorRoute = location.pathname.includes('/distributor');
-  const isDirectRoute = location.pathname.includes('/corporate');
   const isOrderReportApproved = location.pathname.includes('/order-report-approved');
+  const mode = isReportRoute || orderNumberFetch ? 'update' : 'create';
+
   const editingRowSelectRef = useRef(null);
-  const customerSelectRef = useRef(null); 
+  const customerSelectRef = useRef(null);
   const addButtonRef = useRef(null);
-  // Header States
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [voucherType, setVoucherType] = useState('Sales Order');
-  const [customerName, setCustomerName] = useState(null);
-  const [executiveName, setExecutiveName] = useState(null);
-  const [remarks, setRemarks] = useState('');
-  const [status, setStatus] = useState('pending');
-  // Order Data States
-  const [orderData, setOrderData] = useState([]);
-  const [originalOrderData, setOriginalOrderData] = useState([]);
-  // check if view only
-  const isViewOnlyReport = location.pathname.includes('order-report-corporate') || 
-  location.pathname.includes('order-report-distributor');
-  // Add a new empty row for data entry
-  const [editingRow, setEditingRow] = useState({
-    item: null,
-    delivery_date: '',
-    delivery_mode: '',
-    quantity: '',
-    rate: '',
-    amount: '',
-    disc: '',
-    discAmt: 0,
-    splDisc: '',
-    splDiscAmt: 0,
-    hsn: '',
-    gst: '',
-    sgst: '',
-    cgst: '',
-    igst: '',
-  });
 
- const handleBackClick = () => {
-  const confirmLeave = window.confirm(
-    mode === 'update'
-      ? 'Do you want to leave without saving changes?'
-      : 'Do you want to leave this order?'
-  );
+  const handleBackClick = () => {
+    const confirmLeave = window.confirm(
+      mode === 'update'
+        ? 'Do you want to leave without saving changes?'
+        : 'Do you want to leave this order?',
+    );
 
-  if (!confirmLeave) return;
+    if (!confirmLeave) return;
 
-  if (typeof onBack === 'function') {
-    onBack();
-  } else {
-    navigate(-1);
-  }
-};
-
-  // Fetch order details
-  useEffect(() => {
-  if (mode !== 'update') return;
-
-  const fetchOrderDetails = async () => {
-    setLoading(true);
-    try {
-      const response = await api.get(`orders-by-number/${orderNumberFetch}`);
-      const fetchedOrderData = response.data;
-
-      if (fetchedOrderData?.length) {
-        const transformedData = transformOrderData(fetchedOrderData);
-        setOrderData(transformedData);
-        setOriginalOrderData(transformedData);
-
-        const firstItem = fetchedOrderData[0];
-        setVoucherType(firstItem.voucher_type || 'Sales Order');
-        setCustomerName({
-          customer_code: firstItem.customer_code,
-          customer_name: firstItem.customer_name,
-        });
-        setExecutiveName({ customer_name: firstItem.executive });
-        setDate(formatDateForInput(firstItem.created_at));
-        setStatus(firstItem.status || 'pending');
-        setRemarks(firstItem.remarks || '');
-      } else {
-        toast.error('No data found for this order.');
-      }
-    } catch (error) {
-      toast.error('Failed to load order details.');
-    } finally {
-      setLoading(false);
+    if (typeof onBack === 'function') {
+      onBack();
+    } else {
+      navigate(-1);
     }
   };
 
-  fetchOrderDetails();
-}, [mode, orderNumberFetch]);
+  // Fetch order details
+  useEffect(() => {
+    if (mode !== 'update') return;
 
+    const fetchOrderDetails = async () => {
+      setLoading(true);
+      try {
+        const response = await api.get(`orders-by-number/${orderNumberFetch}`);
+        const fetchedOrderData = response.data;
+
+        if (fetchedOrderData?.length) {
+          const transformedData = transformOrderData(fetchedOrderData);
+          setOrderData(transformedData);
+          setOriginalOrderData(transformedData);
+
+          // Log to check what GST type the fetched data has
+          transformedData.forEach((row, index) => {
+            console.log(`Row ${index} GST type:`, {
+              sgst: row.sgst,
+              cgst: row.cgst,
+              igst: row.igst,
+              gst: row.gst,
+            });
+          });
+
+          const firstItem = fetchedOrderData[0];
+          setVoucherType(firstItem.voucher_type || 'Sales Order');
+          setCustomerName({
+            customer_code: firstItem.customer_code,
+            customer_name: firstItem.customer_name,
+          });
+          setExecutiveName({ customer_name: firstItem.executive });
+          setDate(formatDateForInput(firstItem.created_at));
+          setStatus(firstItem.status || 'pending');
+          setRemarks(firstItem.remarks || '');
+
+          // Extract totals from the first item
+          const dbTotals = {
+            qty: firstItem.total_quantity || 0,
+            amount: firstItem.total_amount_without_tax || 0,
+            sgstAmt: firstItem.total_sgst_amount || 0,
+            cgstAmt: firstItem.total_cgst_amount || 0,
+            igstAmt: firstItem.total_igst_amount || 0,
+            totalAmount: firstItem.total_amount || 0,
+          };
+
+          // Set the totals directly instead of calculating
+          setDbTotals(dbTotals);
+        } else {
+          toast.error('No data found for this order.');
+        }
+      } catch (error) {
+        toast.error('Failed to load order details.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchOrderDetails();
+  }, [mode, orderNumberFetch]);
+
+  // Rest of your useEffect hooks remain the same
   useEffect(() => {
     const timer = setTimeout(() => {
       console.log('Focus management running');
-      
+
       if (isDistributorRoute) {
-        // For distributor route: Always focus editing row
         if (editingRowSelectRef.current) {
           editingRowSelectRef.current.focus();
           console.log('Focused editing row for distributor');
         }
       } else if (isDirectRoute) {
-        // For corporate route
         if (!customerName) {
-          // No customer selected: Focus customer select
           if (customerSelectRef.current) {
             customerSelectRef.current.focus();
             console.log('Focused customer select (no customer yet)');
           }
         } else {
-          // Customer is selected: Focus editing row
           if (editingRowSelectRef.current) {
             editingRowSelectRef.current.focus();
             console.log('Focused editing row (customer selected)');
           }
         }
       }
-    }, 200); // Slightly longer delay to ensure DOM is ready
+    }, 200);
 
     return () => clearTimeout(timer);
   }, [isDistributorRoute, isDirectRoute, customerName, location.pathname, formResetKey]);
 
   // Initialize order number
   useEffect(() => {
-  if (mode === 'create') {
-    const newOrderNumber = generateClientSideOrderNumber();
-    setOrderNumber(newOrderNumber);
-  } else {
-    setOrderNumber(orderNumberFetch);
-  }
-}, [mode, date, orderNumberFetch]);
+    if (mode === 'create') {
+      const newOrderNumber = generateClientSideOrderNumber();
+      setOrderNumber(newOrderNumber);
+    } else {
+      setOrderNumber(orderNumberFetch);
+    }
+  }, [mode, date, orderNumberFetch]);
 
   // Handle customer selection
-  const handleCustomerSelect = (selected) => {
+  const handleCustomerSelect = selected => {
     setCustomerName(selected);
     setSelectedCustomer(selected);
   };
@@ -171,362 +201,523 @@ const NewOrder = ({ onBack }) => {
 
     if (key === 'ArrowUp') {
       e.preventDefault();
-      // Move back to Add button
       addButtonRef.current?.focus();
     } else if (key === 'ArrowLeft' || key === 'ArrowRight' || key === 'ArrowDown') {
       // Allow normal text navigation
     } else if (key === 'Tab' && !e.shiftKey) {
       e.preventDefault();
-      // Move to Status select
       const statusSelect = document.querySelector('select[disabled]');
       if (statusSelect) {
         statusSelect.focus();
       }
     } else if (key === 'Tab' && e.shiftKey) {
       e.preventDefault();
-      // Move back to Add button
       addButtonRef.current?.focus();
     }
   };
 
-  // Helper function to check if state is Tamil Nadu
-    const isTamilNaduState = () => {
-      let customerState = '';
-  
-      if (isDistributorRoute) {
-        // For distributor route, check distributorUser state
-        customerState = distributorUser?.state || '';
-        console.log('Distributor State:', customerState);
-      } else {
-        // For non-distributor route, check selected customer state
-        customerState = selectedCustomer?.state || '';
-        console.log('Customer State:', customerState);
-      }
-  
-      // Normalize the state string for comparison
-      const normalizedState = customerState.toLowerCase().trim();
-      return (
-        normalizedState === 'tamil nadu' ||
-        normalizedState === 'tn' ||
-        normalizedState === 'tamilnadu'
-      );
-    };
+  // Create a memoized version of isTamilNaduState that includes selectedCustomer
+  const isTamilNaduState = useCallback(() => {
+    // First check user role
+    const role = userRole.toLowerCase();
 
-  // calculate totals
-  const totals = useMemo(() => {
-    const totalQty = orderData.reduce((sum, row) => sum + Number(row.itemQty || 0), 0);
-    const totalAmt = orderData.reduce((sum, row) => sum + Number(row.amount || 0), 0);
-
-    const totalSgstAmt = orderData.reduce((sum, row) => sum + Number(row.sgst || 0), 0);
-    const totalCgstAmt = orderData.reduce((sum, row) => sum + Number(row.cgst || 0), 0);
-    const totalIgstAmt = orderData.reduce((sum, row) => sum + Number(row.igst || 0), 0);
-
-    const editingRowQty = Number(editingRow.quantity || 0);
-    const editingRowAmount = Number(editingRow.amount || 0);
-    const editingRowSgst = Number(editingRow.sgst || 0);
-    const editingRowCgst = Number(editingRow.cgst || 0);
-    const editingRowIgst = Number(editingRow.igst || 0);
-
-    if (isTamilNaduState()) {
-      const totalAmountValue = totalAmt + editingRowAmount + (totalSgstAmt + editingRowSgst) + (totalCgstAmt + editingRowCgst);
-      
-      return {
-        qty: totalQty + editingRowQty,
-        amount: totalAmt + editingRowAmount,
-        sgstAmt: totalSgstAmt + editingRowSgst,
-        cgstAmt: totalCgstAmt + editingRowCgst,
-        igstAmt: 0,
-        netAmt: 0,
-        grossAmt: 0,
-        totalAmount: totalAmountValue,
-      };
-    } else {
-      const totalAmountValue = totalAmt + editingRowAmount + (totalIgstAmt + editingRowIgst);
-      
-      return {
-        qty: totalQty + editingRowQty,
-        amount: totalAmt + editingRowAmount,
-        sgstAmt: 0,
-        cgstAmt: 0,
-        igstAmt: totalIgstAmt + editingRowIgst,
-        netAmt: 0,
-        grossAmt: 0,
-        totalAmount: totalAmountValue,
-      };
+    // If user is admin, always return false
+    if (role === 'admin') {
+      console.log('Admin user detected - state-based GST disabled');
+      return false;
     }
-  }, [orderData, editingRow, isTamilNaduState]);
+
+    // Only check state for 'direct' and 'distributor' roles
+    if (role !== 'direct' && role !== 'distributor') {
+      console.log(`User role ${role} - state-based GST disabled`);
+      return false;
+    }
+
+    let customerState = '';
+
+    if (isDistributorRoute) {
+      customerState = distributorUser?.state || '';
+      console.log('Distributor State:', customerState);
+    } else {
+      customerState = selectedCustomer?.state || '';
+      console.log('Customer State:', customerState, 'Selected Customer:', selectedCustomer);
+    }
+
+    const normalizedState = customerState.toLowerCase().trim();
+    const isTamilNadu =
+      normalizedState === 'tamil nadu' ||
+      normalizedState === 'tn' ||
+      normalizedState === 'tamilnadu';
+
+    console.log(`isTamilNaduState check:`, {
+      role,
+      customerState,
+      normalizedState,
+      isTamilNadu,
+      isDistributorRoute,
+      hasSelectedCustomer: !!selectedCustomer,
+    });
+
+    return isTamilNadu;
+  }, [userRole, isDistributorRoute, distributorUser, selectedCustomer]);
+
+  // Debug log to check values
+  useEffect(() => {
+    console.log('Debug - Current values:', {
+      userRole,
+      isDistributorRoute,
+      selectedCustomer: selectedCustomer?.state,
+      distributorUser: distributorUser?.state,
+      isTamilNadu: isTamilNaduState(),
+    });
+  }, [userRole, isDistributorRoute, selectedCustomer, distributorUser, isTamilNaduState]);
+
+// calculate totals - ALWAYS calculate dynamically, even in update mode
+const totals = useMemo(() => {
+  // For update mode, we should still calculate dynamically based on current data
+  // Only use dbTotals if we have no orderData (initial load)
+  if (mode === 'update' && dbTotals && orderData.length === 0) {
+    console.log('Initial load - Using database totals:', dbTotals);
+    return {
+      qty: parseFloat(dbTotals.qty) || 0,
+      amount: parseFloat(dbTotals.amount) || 0,
+      discAmt: parseFloat(dbTotals.discAmt) || 0,
+      splDiscAmt: parseFloat(dbTotals.splDiscAmt) || 0,
+      sgstAmt: parseFloat(dbTotals.sgstAmt) || 0,
+      cgstAmt: parseFloat(dbTotals.cgstAmt) || 0,
+      igstAmt: parseFloat(dbTotals.igstAmt) || 0,
+      totalAmount: parseFloat(dbTotals.totalAmount) || 0,
+      baseAmount: parseFloat(dbTotals.amount) || 0, // Add baseAmount for consistency
+    };
+  }
+  
+  // Calculate totals including discounts - DYNAMIC CALCULATION
+  console.log('Calculating dynamic totals for mode:', mode, 'Order data length:', orderData.length);
+  
+  let totalQty = 0;
+  let totalBaseAmount = 0; // Amount before discounts
+  let totalDiscAmt = 0;
+  let totalSplDiscAmt = 0;
+  let totalSgstAmt = 0;
+  let totalCgstAmt = 0;
+  let totalIgstAmt = 0;
+  let totalAmount = 0; // Final amount after discounts and GST
+
+  // Calculate for existing rows
+  orderData.forEach(row => {
+    const qty = parseFloat(row.itemQty) || 0;
+    const rate = parseFloat(row.rate) || 0;
+    totalQty += qty;
+    
+    const baseAmount = qty * rate;
+    totalBaseAmount += baseAmount;
+    
+    const discAmt = parseFloat(row.discAmt) || 0;
+    const splDiscAmt = parseFloat(row.splDiscAmt) || 0;
+    
+    totalDiscAmt += discAmt;
+    totalSplDiscAmt += splDiscAmt;
+    
+    const discountedAmount = baseAmount - discAmt - splDiscAmt;
+    
+    // Add GST amounts
+    totalSgstAmt += parseFloat(row.sgst) || 0;
+    totalCgstAmt += parseFloat(row.cgst) || 0;
+    totalIgstAmt += parseFloat(row.igst) || 0;
+    
+    // Add final amount (should match row.amount)
+    totalAmount += parseFloat(row.amount) || 0;
+  });
+
+  // Calculate for editing row if it has data
+  let editingRowQty = 0;
+  let editingRowBaseAmount = 0;
+  let editingRowDiscAmt = 0;
+  let editingRowSplDiscAmt = 0;
+  let editingRowSgst = 0;
+  let editingRowCgst = 0;
+  let editingRowIgst = 0;
+  let editingRowAmount = 0;
+
+  const hasEditingRowData = editingRow.item && editingRow.quantity;
+  if (hasEditingRowData) {
+    editingRowQty = parseFloat(editingRow.quantity) || 0;
+    const editingRowRate = parseFloat(editingRow.rate) || 0;
+    editingRowBaseAmount = editingRowQty * editingRowRate;
+    
+    editingRowDiscAmt = parseFloat(editingRow.discAmt) || 0;
+    editingRowSplDiscAmt = parseFloat(editingRow.splDiscAmt) || 0;
+    
+    editingRowSgst = parseFloat(editingRow.sgst) || 0;
+    editingRowCgst = parseFloat(editingRow.cgst) || 0;
+    editingRowIgst = parseFloat(editingRow.igst) || 0;
+    
+    editingRowAmount = parseFloat(editingRow.amount) || 0;
+  }
+
+  // Combine totals including editing row
+  const finalTotalQty = totalQty + editingRowQty;
+  const finalTotalBaseAmount = totalBaseAmount + editingRowBaseAmount;
+  const finalTotalDiscAmt = totalDiscAmt + editingRowDiscAmt;
+  const finalTotalSplDiscAmt = totalSplDiscAmt + editingRowSplDiscAmt;
+  const finalTotalSgstAmt = totalSgstAmt + editingRowSgst;
+  const finalTotalCgstAmt = totalCgstAmt + editingRowCgst;
+  const finalTotalIgstAmt = totalIgstAmt + editingRowIgst;
+  const finalTotalAmount = totalAmount + editingRowAmount;
+  
+  // Calculate amount without tax (after discounts, before GST)
+  const amountWithoutTax = finalTotalBaseAmount - finalTotalDiscAmt - finalTotalSplDiscAmt;
+  
+  // Verify calculation: amountWithoutTax + GST should equal totalAmount
+  const calculatedTotalAmount = amountWithoutTax + finalTotalSgstAmt + finalTotalCgstAmt + finalTotalIgstAmt;
+  
+  console.log('Dynamic Totals Calculation for mode', mode, ':', {
+    finalTotalQty,
+    finalTotalBaseAmount,
+    finalTotalDiscAmt,
+    finalTotalSplDiscAmt,
+    amountWithoutTax,
+    finalTotalSgstAmt,
+    finalTotalCgstAmt,
+    finalTotalIgstAmt,
+    finalTotalAmount,
+    calculatedTotalAmount,
+    difference: Math.abs(finalTotalAmount - calculatedTotalAmount),
+    orderDataLength: orderData.length,
+    hasEditingRowData
+  });
+  
+  return {
+    qty: finalTotalQty,
+    amount: amountWithoutTax, // Amount after discounts, before GST
+    baseAmount: finalTotalBaseAmount, // Amount before any discounts
+    discAmt: finalTotalDiscAmt,
+    splDiscAmt: finalTotalSplDiscAmt,
+    sgstAmt: finalTotalSgstAmt,
+    cgstAmt: finalTotalCgstAmt,
+    igstAmt: finalTotalIgstAmt,
+    totalAmount: finalTotalAmount, // Final amount after discounts and GST
+    calculatedTotalAmount, // For debugging
+  };
+}, [orderData, editingRow, isTamilNaduState, mode, dbTotals]);
+
+// Add this useEffect to debug totals changes
+useEffect(() => {
+  console.log('=== TOTALS DEBUG ===');
+  console.log('Order Data:', orderData.map(row => ({
+    item: row.itemName,
+    qty: row.itemQty,
+    rate: row.rate,
+    baseAmount: (parseFloat(row.itemQty) || 0) * (parseFloat(row.rate) || 0),
+    disc: row.disc,
+    discAmt: row.discAmt,
+    splDisc: row.splDisc,
+    splDiscAmt: row.splDiscAmt,
+    sgst: row.sgst,
+    cgst: row.cgst,
+    igst: row.igst,
+    amount: row.amount,
+    netRate: row.netRate,
+    grossAmount: row.grossAmount
+  })));
+  console.log('Editing Row:', editingRow);
+  console.log('Calculated Totals:', totals);
+}, [orderData, editingRow, totals]);
 
   const handlePrimaryAction = e => {
-  if (mode === 'update') {
-    handleUpdate(e);
-  } else {
-    handleSubmit(e);
-  }
-};
+    if (mode === 'update') {
+      handleUpdate(e);
+    } else {
+      handleSubmit(e);
+    }
+  };
 
-  
-  const handleUpdate = async (e) => { 
-    e.preventDefault(); 
-    setIsSubmitting(true); 
-    try { 
-     const updates = orderData.map(
-      item => ({ 
-        id: item.id, 
-        status: status, 
-        disc_percentage: Number(item.disc) || 0, 
-        disc_amount: Number(item.discAmt) || 0, 
-        spl_disc_percentage: Number(item.splDisc) || 0, 
-        spl_disc_amount: Number(item.splDiscAmt) || 0, 
-        net_rate: Number(item.netRate) || 0, 
-        gross_amount: Number(item.grossAmount) || 0, 
-        quantity: Number(item.itemQty) || 0, 
-        gst: Number(item.gst || 0), 
-        sgst: Number(item.sgst || 0), 
-        cgst: Number(item.cgst || 0), 
-        igst: Number(item.igst || 0), 
-        hsn: item.hsn || '', 
-        rate: Number(item.rate || 0), 
-        amount: Number(item.amount || 0), 
-        uom: item.uom || '', 
-        delivery_date: convertToMySQLDate(item.delivery_date), 
-        delivery_mode: item.delivery_mode || '', 
-        total_quantity: totals.qty, 
-        total_amount: totals.totalAmount, 
-        total_sgst_amount: totals.sgstAmt, 
-        total_cgst_amount: totals.cgstAmt, 
-        total_igst_amount: totals.igstAmt, 
-        remarks: remarks || '', 
-      })); 
-      // Log for debugging 
-      console.log('Sending update for order:', orderNumber); 
-      console.log('Update payload sample:', updates[0]); 
-      console.log('Totals:', { total_quantity: totals.qty, total_amount: totals.totalAmount, total_sgst_amount: totals.sgstAmt, total_cgst_amount: totals.cgstAmt, total_igst_amount: totals.igstAmt, }); 
-      const response = await api.put(`/orders-by-number/${orderNumber}`, updates); 
-      console.log('Update response:', response.data); 
-      toast.success('Order updated successfully!'); navigate(-1); 
-    } catch (error) { 
-      console.error('Error updating order:', error); 
-      console.error('Error details:', error.response?.data); 
-    } finally { setIsSubmitting(false); } };
-
- const postOrder = async (payload) => {
-  try {
-    console.log('Sending order payload:', payload);
-    const response = await api.post('/orders', payload);
-    console.log('Order response:', response);
-    return response.data;
-  } catch (error) {
-    console.error('Error placing order:', error);
-    console.error('Error response:', error.response?.data);
-    throw error;
-  }
-};
-
-// Handle form submission
-const handleSubmit = async (e) => {
+  const handleUpdate = async e => {
   e.preventDefault();
-
-  if (isSubmitting) return;
   setIsSubmitting(true);
-
   try {
-    // Validation
-    if (!isDistributorRoute && !customerName) {
-      toast.error('Please select a customer name.');
-      setIsSubmitting(false);
-      return;
-    }
-
-    const hasEditingRowData = editingRow.item && editingRow.quantity;
-    if (!orderData.length && !hasEditingRowData) {
-      toast.error('No items in the order.');
-      setIsSubmitting(false);
-      return;
-    }
-
-    // Additional validation for editing row
-    if (hasEditingRowData) {
-      if (!editingRow.delivery_date || editingRow.delivery_date.trim() === '') {
-        toast.error('Please enter delivery date for the current item!');
-        setIsSubmitting(false);
-        return;
-      }
-      if (!editingRow.delivery_mode || editingRow.delivery_mode.trim() === '') {
-        toast.error('Please enter delivery mode for the current item!');
-        setIsSubmitting(false);
-        return;
-      }
-    }
-
-    // Validate existing rows
-    for (const row of orderData) {
-      if (!row.delivery_date || row.delivery_date.trim() === '') {
-        toast.error(`Please enter delivery date for item: ${row.itemName}`);
-        setIsSubmitting(false);
-        return;
-      }
-      if (!row.delivery_mode || row.delivery_mode.trim() === '') {
-        toast.error(`Please enter delivery mode for item: ${row.itemName}`);
-        setIsSubmitting(false);
-        return;
-      }
-    }
-
-    const voucherType = isDirectRoute 
-      ? 'Direct Order Management' 
-      : isDistributorRoute 
-      ? 'Distributor Order-Web Based' 
-      : 'Sales Order';
-
-    const customer = isDistributorRoute
-      ? {
-          customer_code: distributorUser?.customer_code || 'DISTRIBUTOR',
-          customer_name: distributorUser?.customer_name || 'Distributor User',
-        }
-      : {
-          customer_code: customerName?.customer_code || '',
-          customer_name: customerName?.customer_name || '',
-        };
-
-    // Prepare rows array
-    const rows = [...orderData];
-
-    // Add editing row if it has data
-    if (hasEditingRowData) {
-      // Validate editing row rate and amount
-      const rate = Number(editingRow.rate) || 0;
-      const quantity = Number(editingRow.quantity) || 0;
-      const amount = rate * quantity;
-      
-      // Ensure GST values are properly set
-      const gstPercentage = Number(editingRow.gst) || 18;
-      const gstAmount = amount * (gstPercentage / 100);
-      
-      let sgst = 0;
-      let cgst = 0;
-      let igst = 0;
-      
-      if (isTamilNaduState()) {
-        const halfGST = gstAmount / 2;
-        sgst = halfGST;
-        cgst = halfGST;
-        igst = 0;
-      } else {
-        sgst = 0;
-        cgst = 0;
-        igst = gstAmount;
-      }
-
-      rows.push({
-        item: editingRow.item,
-        itemCode: editingRow.item.item_code,
-        itemName: editingRow.item.stock_item_name,
-        hsn: editingRow.hsn || editingRow.item.hsn_code || '',
-        gst: gstPercentage,
-        sgst: sgst.toFixed(2),
-        cgst: cgst.toFixed(2),
-        igst: igst.toFixed(2),
-        delivery_date: editingRow.delivery_date,
-        delivery_mode: editingRow.delivery_mode,
-        itemQty: quantity,
-        uom: editingRow.item.uom || 'Nos',
-        rate: rate,
-        amount: amount,
-        netRate: rate,
-        grossAmount: amount,
-      });
-    }
-
-    // Log rows for debugging
-    console.log('Rows to submit:', rows);
-
-    // Prepare payload - SEND AS ARRAY if your API expects array of items
-    const payload = rows.map((item, index) => ({
-      voucher_type: voucherType,
-      order_no: orderNumber,
-      date: date,
-      status: 'pending',
-      executiveCode: distributorUser?.customer_code || '',
-      executive: distributorUser?.customer_name || '',
-      role: distributorUser?.role || '',
-      ...customer,
-      item_code: item.itemCode,
-      item_name: item.itemName,
-      hsn: item.hsn,
+    // Log current totals for debugging
+    console.log('Update - Current totals:', totals);
+    console.log('Update - Order data:', orderData);
+    
+    const updates = orderData.map(item => ({
+      id: item.id,
+      status: status,
+      disc_percentage: Number(item.disc) || 0,
+      disc_amount: Number(item.discAmt) || 0,
+      spl_disc_percentage: Number(item.splDisc) || 0,
+      spl_disc_amount: Number(item.splDiscAmt) || 0,
+      net_rate: Number(item.netRate) || 0,
+      gross_amount: Number(item.grossAmount) || 0,
+      quantity: Number(item.itemQty) || 0,
       gst: Number(item.gst || 0),
       sgst: Number(item.sgst || 0),
       cgst: Number(item.cgst || 0),
       igst: Number(item.igst || 0),
-      delivery_date: convertToMySQLDate(item.delivery_date),
-      delivery_mode: item.delivery_mode,
-      quantity: Number(item.itemQty || 0),
-      uom: item.uom,
+      hsn: item.hsn || '',
       rate: Number(item.rate || 0),
       amount: Number(item.amount || 0),
-      net_rate: Number(item.netRate || item.rate || 0),
-      gross_amount: Number(item.grossAmount || item.amount || 0),
-      disc_percentage: 0,
-      disc_amount: 0,
-      spl_disc_percentage: 0,
-      spl_disc_amount: 0,
+      uom: item.uom || '',
+      delivery_date: convertToMySQLDate(item.delivery_date),
+      delivery_mode: item.delivery_mode || '',
+      // Use dynamically calculated totals
       total_quantity: totals.qty,
-      total_cgst_amount: totals.cgstAmt,
-      total_sgst_amount: totals.sgstAmt,
-      total_igst_amount: totals.igstAmt,
+      total_amount_without_tax: totals.amount, // Amount after discounts, before GST
+      total_disc_amount: totals.discAmt || 0,
+      total_spl_disc_amount: totals.splDiscAmt || 0,
       total_amount: totals.totalAmount,
+      total_sgst_amount: totals.sgstAmt,
+      total_cgst_amount: totals.cgstAmt,
+      total_igst_amount: totals.igstAmt,
       remarks: remarks || '',
-      row_index: index + 1, // Add row index for reference
     }));
-
-    // Log final payload
-    console.log('Final payload:', payload);
-
-    // Check if payload is empty
-    if (payload.length === 0) {
-      toast.error('No items to submit!');
-      setIsSubmitting(false);
-      return;
-    }
-
-    // Submit order
-    await postOrder(payload);
     
-    toast.success(`Order ${orderNumber} placed successfully!`);
+    // Log for debugging
+    console.log('Sending update for order:', orderNumber);
+    console.log('Update payload sample:', updates[0]);
+    console.log('Dynamic Totals being sent:', {
+      total_quantity: totals.qty,
+      total_amount_without_tax: totals.amount,
+      total_disc_amount: totals.discAmt,
+      total_spl_disc_amount: totals.splDiscAmt,
+      total_amount: totals.totalAmount,
+      total_sgst_amount: totals.sgstAmt,
+      total_cgst_amount: totals.cgstAmt,
+      total_igst_amount: totals.igstAmt,
+    });
     
-    // Reset form after successful submission
-    resetForm();
-    
+    const response = await api.put(`/orders-by-number/${orderNumber}`, updates);
+    console.log('Update response:', response.data);
+    toast.success('Order updated successfully!');
+    navigate(-1);
   } catch (error) {
-    console.error('Submission error:', error);
-    
-    // More specific error messages
-    if (error.response) {
-      // Server responded with error status
-      const serverError = error.response.data;
-      console.error('Server error response:', serverError);
-      
-      if (serverError.message) {
-        toast.error(`Server Error: ${serverError.message}`);
-      } else if (serverError.error) {
-        toast.error(`Server Error: ${serverError.error}`);
-      } else {
-        toast.error('Error placing order. Please check console for details.');
-      }
-    } else if (error.request) {
-      // Request was made but no response
-      console.error('No response received:', error.request);
-      toast.error('No response from server. Please check your connection.');
-    } else {
-      // Something else happened
-      console.error('Error setting up request:', error.message);
-      toast.error(`Error: ${error.message}`);
-    }
+    console.error('Error updating order:', error);
+    console.error('Error details:', error.response?.data);
+    toast.error('Failed to update order. Please check console for details.');
   } finally {
     setIsSubmitting(false);
   }
 };
 
-const resetForm = () => {
+  const postOrder = async payload => {
+    try {
+      console.log('Sending order payload:', payload);
+      const response = await api.post('/orders', payload);
+      console.log('Order response:', response);
+      return response.data;
+    } catch (error) {
+      console.error('Error placing order:', error);
+      console.error('Error response:', error.response?.data);
+      throw error;
+    }
+  };
+
+  // Handle form submission
+  const handleSubmit = async e => {
+    e.preventDefault();
+
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+
+    try {
+      // Validation
+      if (!isDistributorRoute && !customerName) {
+        toast.error('Please select a customer name.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      const hasEditingRowData = editingRow.item && editingRow.quantity;
+      if (!orderData.length && !hasEditingRowData) {
+        toast.error('No items in the order.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Additional validation for editing row
+      if (hasEditingRowData) {
+        if (!editingRow.delivery_date || editingRow.delivery_date.trim() === '') {
+          toast.error('Please enter delivery date for the current item!');
+          setIsSubmitting(false);
+          return;
+        }
+        if (!editingRow.delivery_mode || editingRow.delivery_mode.trim() === '') {
+          toast.error('Please enter delivery mode for the current item!');
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
+      // Validate existing rows
+      for (const row of orderData) {
+        if (!row.delivery_date || row.delivery_date.trim() === '') {
+          toast.error(`Please enter delivery date for item: ${row.itemName}`);
+          setIsSubmitting(false);
+          return;
+        }
+        if (!row.delivery_mode || row.delivery_mode.trim() === '') {
+          toast.error(`Please enter delivery mode for item: ${row.itemName}`);
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
+      const voucherType = isDirectRoute
+        ? 'Direct Order Management'
+        : isDistributorRoute
+        ? 'Distributor Order-Web Based'
+        : 'Sales Order';
+
+      const customer = isDistributorRoute
+        ? {
+            customer_code: distributorUser?.customer_code || 'DISTRIBUTOR',
+            customer_name: distributorUser?.customer_name || 'Distributor User',
+          }
+        : {
+            customer_code: customerName?.customer_code || '',
+            customer_name: customerName?.customer_name || '',
+          };
+
+      // Prepare rows array
+      const rows = [...orderData];
+
+      // Add editing row if it has data
+      if (hasEditingRowData) {
+        // Validate editing row rate and amount
+        const rate = Number(editingRow.rate) || 0;
+        const quantity = Number(editingRow.quantity) || 0;
+        const amount = rate * quantity;
+
+        // Ensure GST values are properly set
+        const gstPercentage = Number(editingRow.gst) || 18;
+        const gstAmount = amount * (gstPercentage / 100);
+
+        let sgst = 0;
+        let cgst = 0;
+        let igst = 0;
+
+        if (isTamilNaduState()) {
+          const halfGST = gstAmount / 2;
+          sgst = halfGST;
+          cgst = halfGST;
+          igst = 0;
+        } else {
+          sgst = 0;
+          cgst = 0;
+          igst = gstAmount;
+        }
+
+        rows.push({
+          item: editingRow.item,
+          itemCode: editingRow.item.item_code,
+          itemName: editingRow.item.stock_item_name,
+          hsn: editingRow.hsn || editingRow.item.hsn_code || '',
+          gst: gstPercentage,
+          sgst: sgst.toFixed(2),
+          cgst: cgst.toFixed(2),
+          igst: igst.toFixed(2),
+          delivery_date: editingRow.delivery_date,
+          delivery_mode: editingRow.delivery_mode,
+          itemQty: quantity,
+          uom: editingRow.item.uom || 'Nos',
+          rate: rate,
+          amount: amount,
+          netRate: rate,
+          grossAmount: amount,
+        });
+      }
+
+      // Log rows for debugging
+      console.log('Rows to submit:', rows);
+
+      // Prepare payload
+      const payload = rows.map((item, index) => ({
+        voucher_type: voucherType,
+        order_no: orderNumber,
+        date: date,
+        status: 'pending',
+        executiveCode: distributorUser?.customer_code || '',
+        executive: distributorUser?.customer_name || '',
+        role: distributorUser?.role || '',
+        ...customer,
+        item_code: item.itemCode,
+        item_name: item.itemName,
+        hsn: item.hsn,
+        gst: Number(item.gst || 0),
+        sgst: Number(item.sgst || 0),
+        cgst: Number(item.cgst || 0),
+        igst: Number(item.igst || 0),
+        delivery_date: convertToMySQLDate(item.delivery_date),
+        delivery_mode: item.delivery_mode,
+        quantity: Number(item.itemQty || 0),
+        uom: item.uom,
+        rate: Number(item.rate || 0),
+        amount: Number(item.amount || 0),
+        net_rate: Number(item.netRate || 0),
+        gross_amount: Number(item.grossAmount || 0),
+        disc_percentage: Number(item.disc || 0),
+        disc_amount: Number(item.discAmt || 0),
+        spl_disc_percentage: Number(item.splDisc || 0),
+        spl_disc_amount: Number(item.splDiscAmt || 0),
+        total_quantity: totals.qty,
+        total_disc_amount: totals.discAmt || 0,
+        total_spl_disc_amount: totals.splDiscAmt || 0,
+        total_amount_without_tax: totals.amount,
+        total_cgst_amount: totals.cgstAmt,
+        total_sgst_amount: totals.sgstAmt,
+        total_igst_amount: totals.igstAmt,
+        total_amount: totals.totalAmount,
+        remarks: remarks || '',
+      }));
+
+      // Log final payload
+      console.log('Final payload:', payload);
+
+      // Check if payload is empty
+      if (payload.length === 0) {
+        toast.error('No items to submit!');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Submit order
+      await postOrder(payload);
+
+      toast.success(`Order ${orderNumber} placed successfully!`);
+
+      // Reset form after successful submission
+      resetForm();
+    } catch (error) {
+      console.error('Submission error:', error);
+
+      // More specific error messages
+      if (error.response) {
+        // Server responded with error status
+        const serverError = error.response.data;
+        console.error('Server error response:', serverError);
+
+        if (serverError.message) {
+          toast.error(`Server Error: ${serverError.message}`);
+        } else if (serverError.error) {
+          toast.error(`Server Error: ${serverError.error}`);
+        } else {
+          toast.error('Error placing order. Please check console for details.');
+        }
+      } else if (error.request) {
+        // Request was made but no response
+        console.error('No response received:', error.request);
+        toast.error('No response from server. Please check your connection.');
+      } else {
+        // Something else happened
+        console.error('Error setting up request:', error.message);
+        toast.error(`Error: ${error.message}`);
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const resetForm = () => {
     setOrderData([]);
     setEditingRow({
       item: null,
@@ -541,7 +732,7 @@ const resetForm = () => {
       cgst: '',
       igst: '',
     });
-    
+
     setRemarks('');
     setDate(new Date().toISOString().split('T')[0]);
     setCustomerName(null);
@@ -552,9 +743,17 @@ const resetForm = () => {
     setOrderNumber(newOrderNumber);
   };
 
+  // Clear dbTotals when orderData changes in update mode
+useEffect(() => {
+  if (mode === 'update' && orderData.length > 0) {
+    // When we modify orderData in update mode, clear dbTotals to force dynamic calculation
+    setDbTotals(null);
+    console.log('Cleared dbTotals for dynamic calculation');
+  }
+}, [orderData, mode]);
 
   return (
-    <div className='p-3 bg-amber-50 border-2 h-screen font-amasis'>
+    <div className="p-3 bg-amber-50 border-2 h-screen font-amasis">
       <OrderHeader
         onBack={handleBackClick}
         location={location}
@@ -565,7 +764,7 @@ const resetForm = () => {
         distributorUser={distributorUser}
         isDistributorRoute={isDistributorRoute}
         date={date}
-        setDate={setDate} 
+        setDate={setDate}
         customerSelectRef={customerSelectRef}
         voucherType={voucherType}
         executiveName={executiveName}
@@ -604,7 +803,7 @@ const resetForm = () => {
         isCorporateReport={isCorporateReport}
       />
     </div>
-  )
-}
+  );
+};
 
-export default NewOrder
+export default NewOrder;

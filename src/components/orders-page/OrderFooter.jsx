@@ -9,6 +9,12 @@ const OrderFooter = ({
   isDistributorReport,
   isCorporateReport,
 }) => {
+
+  // Add this for debugging
+  console.log('OrderFooter totals:', totals);
+  console.log('SGST:', totals?.sgstAmt, 'Type:', typeof totals?.sgstAmt);
+  console.log('CGST:', totals?.cgstAmt, 'Type:', typeof totals.cgstAmt);
+  
   return (
     <div className="h-[9vh] flex flex-col border-t">
       {/* First row */}
@@ -45,12 +51,12 @@ const OrderFooter = ({
             <table className="w-full border-b mb-1">
               <tfoot>
                 <tr className="*:border-[#932F67]">
-                  <FooterCell>{totals.qty}</FooterCell>
-                  <FooterCell>{formatCurrency(totals.amount)}</FooterCell>
-                  <FooterCell>{formatCurrency(totals.sgstAmt)}</FooterCell>
-                  <FooterCell>{formatCurrency(totals.cgstAmt)}</FooterCell>
-                  <FooterCell>{formatCurrency(totals.igstAmt)}</FooterCell>
-                  <FooterCell>{formatCurrency(totals.totalAmount)}</FooterCell>
+                  <FooterCell>{totals?.qty || 0}</FooterCell>
+                  <FooterCell>{formatCurrency(totals?.amount)}</FooterCell>
+                  <FooterCell>{formatCurrency(totals?.sgstAmt)}</FooterCell>
+                  <FooterCell>{formatCurrency(totals?.cgstAmt)}</FooterCell>
+                  <FooterCell>{formatCurrency(totals?.igstAmt)}</FooterCell>
+                  <FooterCell>{formatCurrency(totals?.totalAmount)}</FooterCell>
                 </tr>
               </tfoot>
             </table>
