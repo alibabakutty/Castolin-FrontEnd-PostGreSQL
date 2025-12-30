@@ -30,7 +30,6 @@ export const useOrderFormHook = onBack => {
     igst: '',
   });
   const [voucherType, setVoucherType] = useState('Sales Order');
-  // Add this state in NewOrder component
   const [dbTotals, setDbTotals] = useState(null);
   const [executiveName, setExecutiveName] = useState(null);
   const [status, setStatus] = useState('pending');

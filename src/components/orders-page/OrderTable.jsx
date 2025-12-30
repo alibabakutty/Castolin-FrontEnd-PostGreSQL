@@ -51,6 +51,8 @@ const OrderTable = ({
     ? 16
     : 17;
 
+  const visibleOrderData = orderData.filter(row => !row._deleted && !row._markedForDeletion);
+
   // Helper function to check if discount columns are visible
   const showDiscountColumns = () => {
     return !isDistributorReport && !isCorporateReport && !isDistributorOrder && !isDirectOrder;
@@ -498,49 +500,26 @@ const OrderTable = ({
     }, 100);
   };
 
-  const handleDeleteRow = (index) => {
-  const rowToDelete = orderData[index];
-  
-  if (rowToDelete.id) {
-    // For existing rows with ID, mark as deleted
-    const updatedOrderData = [...orderData];
-    updatedOrderData[index] = {
-      ...updatedOrderData[index],
-      _deleted: true,
-      _markedForDeletion: true // Visual indicator
-    };
-    setOrderData(updatedOrderData);
-  } else {
-    // For new rows (without ID), just remove from array
-    const updatedOrderData = orderData.filter((_, i) => i !== index);
-    setOrderData(updatedOrderData);
-  }
-  
-  toast.info('Row marked for deletion. Click Update to save changes.');
-};
+  const handleDeleteRow = index => {
+    const rowToDelete = orderData[index];
 
-  // In OrderTable.js, update handleRemoveItem
-const handleRemoveItem = useCallback(
-  index => {
-    const rowToRemove = orderData[index];
-    
-    if (rowToRemove.id) {
-      // For existing rows from database, mark as deleted
-      const updatedRows = orderData.map((row, i) => 
-        i === index ? { ...row, _deleted: true } : row
-      );
-      setOrderData(updatedRows);
-      console.log('Marked row for deletion:', rowToRemove.id);
+    if (rowToDelete.id) {
+      // For existing rows with ID, mark as deleted
+      const updatedOrderData = [...orderData];
+      updatedOrderData[index] = {
+        ...updatedOrderData[index],
+        _deleted: true,
+        _markedForDeletion: true, // Visual indicator
+      };
+      setOrderData(updatedOrderData);
     } else {
-      // For new rows not yet in database, just remove
-      const updatedRows = orderData.filter((_, i) => i !== index);
-      setOrderData(updatedRows);
+      // For new rows (without ID), just remove from array
+      const updatedOrderData = orderData.filter((_, i) => i !== index);
+      setOrderData(updatedOrderData);
     }
-    
-    toast.info('Item removed from order!');
-  },
-  [orderData, setOrderData],
-);
+
+    toast.info('Row marked for deletion. Click Update to save changes.');
+  };
 
   // Handle date blur formatting
   const handleDateBlur = (e, index) => {
@@ -959,18 +938,21 @@ const handleRemoveItem = useCallback(
             <tbody>
               {/* Existing Rows */}
               {showRowValueRows &&
-                orderData?.map((row, rowIndex) => {
-                  // calculate baseindex for this row
-                  const rowBaseIndex = rowIndex * totalCols;
+                visibleOrderData?.map((row, rowIndex) => {
+                  // Since we're filtering, we need to get the original index
+                  const originalIndex = orderData.findIndex(
+                    r => r === row || (r.id && r.id === row.id),
+                  );
+
+                  const rowBaseIndex = originalIndex * totalCols;
                   return (
                     <TableRow
                       key={rowIndex}
                       row={row}
-                      rowIndex={rowIndex}
+                      rowIndex={originalIndex} // Pass original index for delete operations
                       itemOptions={itemOptions}
                       handleItemSelect={handleItemSelect}
                       handleFieldChange={handleFieldChange}
-                      handleRemoveItem={handleRemoveItem}
                       handleDeleteRow={handleDeleteRow}
                       focusedRateFields={focusedRateFields}
                       setFocusedRateFields={setFocusedRateFields}
@@ -988,6 +970,7 @@ const handleRemoveItem = useCallback(
                       showDiscountColumns={showDiscountColumns()}
                       getActualColumnIndex={getActualColumnIndex}
                       rowBaseIndex={rowBaseIndex}
+                      isDeleted={row._deleted || row._markedForDeletion} // Add this prop
                     />
                   );
                 })}

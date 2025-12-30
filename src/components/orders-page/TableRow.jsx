@@ -8,7 +8,6 @@ const TableRow = ({
   itemOptions,
   handleItemSelect,
   handleFieldChange,
-  handleRemoveItem,
   handleDeleteRow,
   focusedRateFields,
   setFocusedRateFields,
@@ -26,6 +25,7 @@ const TableRow = ({
   showDiscountColumns,
   getActualColumnIndex,
   rowBaseIndex,
+  isDeleted = false,
 }) => {
   const handleRateFocus = () => {
     setFocusedRateFields(prev => ({
@@ -62,7 +62,7 @@ const TableRow = ({
   };
 
   // Helper function to get ref index for a column
-  const getRefIndex = (colIndex) => {
+  const getRefIndex = colIndex => {
     const actualIndex = getActualColumnIndex(colIndex);
     if (actualIndex === -1) return null; // Column doesn't exist
     return rowBaseIndex + actualIndex;
@@ -74,7 +74,10 @@ const TableRow = ({
   };
 
   return (
-    <tr key={rowIndex} className="leading-4 hover:bg-gray-50">
+    <tr
+      key={rowIndex}
+      className={`${isDeleted ? 'bg-red-100 line-through leading-4 hover:bg-gray-50' : ''}`}
+    >
       <td className="border border-gray-400 text-center text-sm w-8 align-middle">
         {rowIndex + 1}
       </td>
@@ -142,7 +145,6 @@ const TableRow = ({
           }}
           onKeyDown={e => handleKeyDown(e, 3)}
           className="w-full h-full pl-2 pr-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-right"
-
         />
       </td>
 
@@ -155,7 +157,7 @@ const TableRow = ({
           }}
           type="text"
           readOnly
-          value={row.uom || "Nos"}
+          value={row.uom || 'Nos'}
           className="w-full h-full text-center focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent"
           onKeyDown={e => handleKeyDown(e, 4)}
         />
