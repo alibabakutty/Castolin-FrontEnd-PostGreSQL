@@ -9,6 +9,7 @@ const TableRow = ({
   handleItemSelect,
   handleFieldChange,
   handleRemoveItem,
+  handleDeleteRow,
   focusedRateFields,
   setFocusedRateFields,
   formatCurrency,
@@ -365,7 +366,7 @@ const TableRow = ({
       {/* Action */}
       <td className="border border-gray-400 text-center text-sm w-14 align-middle">
         <button
-          onClick={() => handleRemoveItem(rowIndex)}
+          onClick={() => handleDeleteRow(rowIndex)}
           className="text-red-500 hover:text-red-600 p-1"
           title="Delete Item"
         >

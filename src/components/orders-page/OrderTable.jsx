@@ -3,7 +3,6 @@ import { toast } from 'react-toastify';
 import api from '../../services/api';
 import TableRow from './TableRow';
 import EditingRow from './EditingRow';
-import { useNavigate } from 'react-router-dom';
 import { formatCurrency, formatDateToDDMMYYYYSimple, validateFutureDate } from './orderUtils';
 
 const OrderTable = ({
@@ -30,7 +29,6 @@ const OrderTable = ({
   const selectRefs = useRef([]);
   const editingRowInputRefs = useRef({});
   const addButtonRef = useRef(null);
-  const navigate = useNavigate();
 
   // Calculate total columns based on order type
   const totalCols = isDistributorOrder
@@ -73,22 +71,6 @@ const OrderTable = ({
         return logicalIndex - 2; // Columns after discount shift left by 2
       }
     }
-  };
-
-  // Get next visible column for keyboard navigation
-  const getNextVisibleColumn = (currentIndex, direction = 1) => {
-    let nextIndex = currentIndex + direction;
-
-    // Skip columns that don't exist based on order type
-    while (!showDiscountColumns() && (nextIndex === 7 || nextIndex === 8)) {
-      nextIndex += direction;
-    }
-
-    // Make sure we stay within bounds
-    if (nextIndex < 1) nextIndex = 1;
-    if (nextIndex > actionColumnIndex) nextIndex = actionColumnIndex;
-
-    return nextIndex;
   };
 
   useEffect(() => {
@@ -318,49 +300,6 @@ const OrderTable = ({
     }
   };
 
-  // Function to apply default discounts (for admin users)
-  const applyDefaultDiscounts = useCallback(
-    (row, defaultDiscount = 0, defaultSplDiscount = 0) => {
-      if (!row.itemQty || !row.rate) return row;
-
-      const qty = Number(row.itemQty);
-      const rate = Number(row.rate);
-      const amt = qty * rate;
-
-      const discAmt = (amt * defaultDiscount) / 100;
-      const splDiscAmt = ((amt - discAmt) * defaultSplDiscount) / 100;
-      const totalDisc = discAmt + splDiscAmt;
-
-      row.disc = defaultDiscount.toString();
-      row.discAmt = discAmt.toFixed(2);
-      row.splDisc = defaultSplDiscount.toString();
-      row.splDiscAmt = splDiscAmt.toFixed(2);
-      row.netRate = ((amt - totalDisc) / qty).toFixed(2);
-      row.grossAmount = (amt - totalDisc).toFixed(2);
-
-      // Recalculate GST with new discounted amount
-      const taxableAmount = amt - totalDisc;
-      const gstPercentage = Number(row.gst || 18);
-      const gstAmount = taxableAmount * (gstPercentage / 100);
-
-      if (isTamilNaduState()) {
-        const halfGST = gstAmount / 2;
-        row.sgst = halfGST.toFixed(2);
-        row.cgst = halfGST.toFixed(2);
-        row.igst = '0';
-      } else {
-        row.sgst = '0';
-        row.cgst = '0';
-        row.igst = gstAmount.toFixed(2);
-      }
-
-      row.amount = (taxableAmount + gstAmount).toFixed(2);
-
-      return row;
-    },
-    [isTamilNaduState],
-  );
-
   // Handle field changes including discounts
   const handleFieldChange = useCallback(
     (field, value, index) => {
@@ -559,15 +498,49 @@ const OrderTable = ({
     }, 100);
   };
 
-  // Handle removing an item
-  const handleRemoveItem = useCallback(
-    index => {
+  const handleDeleteRow = (index) => {
+  const rowToDelete = orderData[index];
+  
+  if (rowToDelete.id) {
+    // For existing rows with ID, mark as deleted
+    const updatedOrderData = [...orderData];
+    updatedOrderData[index] = {
+      ...updatedOrderData[index],
+      _deleted: true,
+      _markedForDeletion: true // Visual indicator
+    };
+    setOrderData(updatedOrderData);
+  } else {
+    // For new rows (without ID), just remove from array
+    const updatedOrderData = orderData.filter((_, i) => i !== index);
+    setOrderData(updatedOrderData);
+  }
+  
+  toast.info('Row marked for deletion. Click Update to save changes.');
+};
+
+  // In OrderTable.js, update handleRemoveItem
+const handleRemoveItem = useCallback(
+  index => {
+    const rowToRemove = orderData[index];
+    
+    if (rowToRemove.id) {
+      // For existing rows from database, mark as deleted
+      const updatedRows = orderData.map((row, i) => 
+        i === index ? { ...row, _deleted: true } : row
+      );
+      setOrderData(updatedRows);
+      console.log('Marked row for deletion:', rowToRemove.id);
+    } else {
+      // For new rows not yet in database, just remove
       const updatedRows = orderData.filter((_, i) => i !== index);
       setOrderData(updatedRows);
-      toast.info('Item removed from order!');
-    },
-    [orderData, setOrderData],
-  );
+    }
+    
+    toast.info('Item removed from order!');
+  },
+  [orderData, setOrderData],
+);
 
   // Handle date blur formatting
   const handleDateBlur = (e, index) => {
@@ -719,14 +692,6 @@ const OrderTable = ({
       let shouldPreventNavigation = false;
 
       if (colIndex === 3) {
-        // Quantity column validation
-        // if (!currentRowData.quantity || currentRowData.quantity.trim() === '') {
-        //   shouldPreventNavigation = true;
-        //   toast.error('Please enter quantity before proceeding!', {
-        //     position: 'bottom-right',
-        //     autoClose: 3000,
-        //   });
-        // }
       } else if (colIndex === 14) {
         // Delivery Date column
         const dateStr = currentRowData.delivery_date || '';
@@ -839,14 +804,6 @@ const OrderTable = ({
       let shouldPreventNavigation = false;
 
       if (colIndex === 3) {
-        // Quantity column
-        // if (!currentRowData.quantity || currentRowData.quantity.trim() === '') {
-        //   shouldPreventNavigation = true;
-        //   toast.error('Please enter quantity before proceeding!', {
-        //     position: 'bottom-right',
-        //     autoClose: 3000,
-        //   });
-        // }
       } else if (colIndex === 14) {
         // Delivery Date column
         if (!currentRowData.delivery_date || currentRowData.delivery_date.trim() === '') {
@@ -1014,6 +971,7 @@ const OrderTable = ({
                       handleItemSelect={handleItemSelect}
                       handleFieldChange={handleFieldChange}
                       handleRemoveItem={handleRemoveItem}
+                      handleDeleteRow={handleDeleteRow}
                       focusedRateFields={focusedRateFields}
                       setFocusedRateFields={setFocusedRateFields}
                       formatCurrency={formatCurrency}
