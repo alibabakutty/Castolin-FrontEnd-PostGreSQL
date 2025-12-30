@@ -9,6 +9,7 @@ const TableRow = ({
   handleItemSelect,
   handleFieldChange,
   handleDeleteRow,
+  handleDeleteButtonKeyDown,
   focusedRateFields,
   setFocusedRateFields,
   formatCurrency,
@@ -361,16 +362,23 @@ const TableRow = ({
             e.target.setSelectionRange(0, e.target.value.length);
           }}
           className="w-full h-full pl-1 font-medium text-[12px] focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent text-center"
-          placeholder="Mode"
+          placeholder=""
         />
       </td>
 
       {/* Action */}
       <td className="border border-gray-400 text-center text-sm w-14 align-middle">
         <button
+          ref={el => {
+            // Add ref for delete button if needed for focus management
+            const refIndex = getRefIndex(16); // Action column index
+            if (refIndex !== null) inputRefs.current[refIndex] = el;
+          }}
           onClick={() => handleDeleteRow(rowIndex)}
-          className="text-red-500 hover:text-red-600 p-1"
+          onKeyDown={e => handleDeleteButtonKeyDown(e, rowIndex)} // Add this
+          className="text-red-500 hover:text-red-600 p-1 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50"
           title="Delete Item"
+          tabIndex={0} // Make it focusable
         >
           <AiFillDelete size={18} />
         </button>

@@ -42,13 +42,13 @@ const OrderTable = ({
     : 17;
 
   const actionColumnIndex = isDistributorOrder
-    ? 16
+    ? 17
     : isDirectOrder
-    ? 16
+    ? 17
     : isDistributorReport
-    ? 16
+    ? 17
     : isCorporateReport
-    ? 16
+    ? 17
     : 17;
 
   const visibleOrderData = orderData.filter(row => !row._deleted && !row._markedForDeletion);
@@ -603,7 +603,7 @@ const OrderTable = ({
       if (colIndex === 1) {
         // Product Code (Select)
         editingRowSelectRef.current?.focus();
-      } else if (colIndex === actionColumnIndex) {
+      } else if (colIndex === actionColumnIndex - 1) {
         // Add button in editing row
         addButtonRef.current?.focus();
       } else {
@@ -882,7 +882,7 @@ const OrderTable = ({
       const prevRowIndex = orderData.length - 1;
       if (prevRowIndex >= 0) {
         // Since delete button is not focusable, move to Delivery Mode in previous row
-        const deliveryModeCol = showDiscountColumns() ? 15 : 13;
+        const deliveryModeCol = showDiscountColumns() ? 16 : 14;
         setTimeout(() => {
           const actualColIndex = getActualColumnIndex(deliveryModeCol);
           if (actualColIndex !== -1) {
@@ -900,6 +900,133 @@ const OrderTable = ({
       }
     }
   };
+
+  // Add this function to your OrderTable component, after handleAddButtonKeyDown
+const handleDeleteButtonKeyDown = (e, rowIndex) => {
+  const key = e.key;
+  const totalRows = orderData.length + 1; // +1 for editing row
+
+  if (key === 'Enter') {
+    e.preventDefault();
+    handleDeleteRow(rowIndex);
+  } else if (key === 'Tab' || key === 'ArrowRight') {
+    e.preventDefault();
+    // Move to next row's first column (Product Code select)
+    let nextRow = rowIndex + 1;
+    let nextCol = 1; // Product Code column
+    
+    // Skip hidden columns
+    if (!showDiscountColumns()) {
+      while (nextCol === 7 || nextCol === 8) {
+        nextCol += 1;
+      }
+    }
+    
+    setTimeout(() => {
+      if (nextRow === totalRows - 1) {
+        // Moving to editing row
+        if (nextCol === 1) {
+          editingRowSelectRef.current?.focus();
+        } else {
+          const fieldMap = getEditingRowFieldMap();
+          const field = fieldMap[nextCol];
+          if (field && editingRowInputRefs.current[field]) {
+            editingRowInputRefs.current[field].focus();
+          }
+        }
+      } else if (nextRow < totalRows - 1) {
+        // Moving to next existing row
+        const actualColIndex = getActualColumnIndex(nextCol);
+        if (actualColIndex !== -1) {
+          const refIndex = nextRow * totalCols + actualColIndex;
+          if (nextCol === 1) {
+            selectRefs.current[refIndex]?.focus();
+          } else {
+            inputRefs.current[refIndex]?.focus();
+          }
+        }
+      }
+    }, 0);
+  } else if (key === 'ArrowLeft') {
+    e.preventDefault();
+    // Move to previous column (Delivery Mode)
+    const prevCol = showDiscountColumns() ? 15 : 13;
+    setTimeout(() => {
+      const actualColIndex = getActualColumnIndex(prevCol);
+      if (actualColIndex !== -1) {
+        const refIndex = rowIndex * totalCols + actualColIndex;
+        inputRefs.current[refIndex]?.focus();
+      }
+    }, 0);
+  } else if (key === 'ArrowUp') {
+    e.preventDefault();
+    // Move to same column in previous row
+    const prevRow = rowIndex - 1;
+    if (prevRow >= 0) {
+      setTimeout(() => {
+        if (prevRow === totalRows - 1) {
+          // Move to editing row action column (Add button)
+          addButtonRef.current?.focus();
+        } else {
+          // Move to previous row's action column
+          // Since delete button is not focusable, move to Delivery Mode in previous row
+          const deliveryModeCol = showDiscountColumns() ? 16 : 14;
+          const actualColIndex = getActualColumnIndex(deliveryModeCol);
+          if (actualColIndex !== -1) {
+            const refIndex = prevRow * totalCols + actualColIndex;
+            inputRefs.current[refIndex]?.focus();
+          }
+        }
+      }, 0);
+    }
+  } else if (key === 'ArrowDown') {
+    e.preventDefault();
+    // Move to same column in next row
+    const nextRow = rowIndex + 1;
+    if (nextRow < totalRows) {
+      setTimeout(() => {
+        if (nextRow === totalRows - 1) {
+          // Move to editing row action column (Add button)
+          addButtonRef.current?.focus();
+        } else {
+          // Move to next row's Delivery Mode column
+          const deliveryModeCol = showDiscountColumns() ? 16 : 14;
+          const actualColIndex = getActualColumnIndex(deliveryModeCol);
+          if (actualColIndex !== -1) {
+            const refIndex = nextRow * totalCols + actualColIndex;
+            inputRefs.current[refIndex]?.focus();
+          }
+        }
+      }, 0);
+    }
+  }
+};
+
+// Helper function for editing row field mapping
+const getEditingRowFieldMap = () => {
+  const fieldMap = {
+    2: 'itemName',
+    3: 'quantity',
+    4: 'uom',
+    5: 'rate',
+    6: 'amount',
+    9: 'hsn',
+    10: 'gst',
+    11: 'sgst',
+    12: 'cgst',
+    13: 'igst',
+    14: 'delivery_date',
+    15: 'delivery_mode',
+  };
+
+  // Add discount fields only if visible
+  if (showDiscountColumns()) {
+    fieldMap[7] = 'disc';
+    fieldMap[8] = 'splDisc';
+  }
+
+  return fieldMap;
+};
 
   // Calculate editing row indices
   const editingRowIndex = orderData.length;
@@ -954,6 +1081,7 @@ const OrderTable = ({
                       handleItemSelect={handleItemSelect}
                       handleFieldChange={handleFieldChange}
                       handleDeleteRow={handleDeleteRow}
+                      handleDeleteButtonKeyDown={handleDeleteButtonKeyDown}
                       focusedRateFields={focusedRateFields}
                       setFocusedRateFields={setFocusedRateFields}
                       formatCurrency={formatCurrency}
