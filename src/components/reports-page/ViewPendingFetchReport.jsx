@@ -3,7 +3,7 @@ import Title from '../Title';
 import api from '../../services/api';
 import { useNavigate } from 'react-router-dom';
 
-const ViewPendingFetchReport = ({ onBack }) => { 
+const ViewPendingFetchReport = ({ onBack }) => {
   const [allOrders, setAllOrders] = useState([]);
   const [filteredOrders, setFilteredOrders] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -18,16 +18,16 @@ const ViewPendingFetchReport = ({ onBack }) => {
 
   // Column configuration matching your existing structure
   const columns = [
-    { key: 'date', label: 'Date', width: '90px', align: 'left' },
-    { key: 'voucher_type', label: 'Vch Type', width: '250px', align: 'left' },
-    { key: 'order_no', label: 'Vch No.', width: '16%', align: 'center' },
+    { key: 'date', label: 'Date', width: '80px', align: 'center' },
+    { key: 'voucher_type', label: 'Vch Type', width: '180px', align: 'left' },
+    { key: 'order_no', label: 'Vch No.', width: '120px', align: 'center' },
     { key: 'customer_code', label: 'Code', width: '100px', align: 'center' },
-    { key: 'customer_name', label: 'Customer', width: '30%', align: 'left' },
-    { key: 'executive', label: 'Executive', width: '28%', align: 'left' },
-    { key: 'delivery_date', label: 'Dely. Date', width: '120px', align: 'left' },
-    { key: 'delivery_mode', label: 'Dely. Mode', width: '100px', align: 'left' },
-    { key: 'status', label: 'Status', width: '9%', align: 'center' },
-    { key: 'amount', label: 'Amount', width: '10%', align: 'right' }
+    { key: 'customer_name', label: 'Customer', width: '300px', align: 'left' },
+    { key: 'executive', label: 'Executive', width: '300px', align: 'left' },
+    { key: 'delivery_date', label: 'Dely. Date', width: '100px', align: 'left' },
+    { key: 'delivery_mode', label: 'Dely. Mode', width: '80px', align: 'left' },
+    { key: 'status', label: 'Status', width: '100px', align: 'left' },
+    { key: 'amount', label: 'Amount', width: '150px', align: 'right' }
   ];
 
   // Filter orders based on search term
@@ -64,7 +64,6 @@ const ViewPendingFetchReport = ({ onBack }) => {
     });
   }, []);
 
-  // Keyboard navigation handler
   useEffect(() => {
     const handleKeyDown = e => {
       switch (e.key) {
@@ -72,22 +71,18 @@ const ViewPendingFetchReport = ({ onBack }) => {
           e.preventDefault();
           setSelectedRow(prev => Math.max(0, prev - 1));
           break;
-
         case 'ArrowDown':
           e.preventDefault();
           setSelectedRow(prev => Math.min(filteredOrders.length - 1, prev + 1));
           break;
-
         case 'ArrowLeft':
           e.preventDefault();
           setSelectedCol(prev => Math.max(0, prev - 1));
           break;
-
         case 'ArrowRight':
           e.preventDefault();
           setSelectedCol(prev => Math.min(columns.length - 1, prev + 1));
           break;
-
         case 'Escape':
           e.preventDefault();
           if (onBack) {
@@ -96,14 +91,12 @@ const ViewPendingFetchReport = ({ onBack }) => {
             navigate(-1);
           }
           break;
-
         case 'Enter':
           e.preventDefault();
           if (filteredOrders[selectedRow]) {
             handleOrderClick(filteredOrders[selectedRow]);
           }
           break;
-
         case 'Home':
           e.preventDefault();
           if (e.ctrlKey) {
@@ -112,7 +105,6 @@ const ViewPendingFetchReport = ({ onBack }) => {
             setSelectedCol(0);
           }
           break;
-
         case 'End':
           e.preventDefault();
           if (e.ctrlKey) {
@@ -121,16 +113,12 @@ const ViewPendingFetchReport = ({ onBack }) => {
             setSelectedCol(columns.length - 1);
           }
           break;
-
         default:
           break;
       }
     };
 
-    // Add event listener
     window.addEventListener('keydown', handleKeyDown);
-
-    // Cleanup
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
@@ -149,7 +137,7 @@ const ViewPendingFetchReport = ({ onBack }) => {
     }
   }, [selectedRow]);
 
-  // Reset selection when filtered orders change
+  // Reset selected index when filter orders change
   useEffect(() => {
     setSelectedRow(0);
     setSelectedCol(0);
@@ -169,14 +157,14 @@ const ViewPendingFetchReport = ({ onBack }) => {
 
         // Get unique pending orders by order_no
         const pendingUniqueOrders = ordersData
-          .filter(order => order.status && order.status.toLowerCase() === 'pending')
-          .reduce((acc, current) => {
-            const existingOrder = acc.find(order => order.order_no === current.order_no);
-            if (!existingOrder) {
-              acc.push(current);
-            }
-            return acc;
-          }, []);
+        .filter(order => order.status && order.status.toLowerCase() === 'pending')
+        .reduce((acc, current) => {
+          const existingOrder = acc.find(order => order.order_no === current.order_no);
+          if (!existingOrder) {
+            acc.push(current);
+          }
+          return acc;
+        }, []);
 
         setAllOrders(pendingUniqueOrders);
         setFilteredOrders(pendingUniqueOrders);
@@ -244,7 +232,9 @@ const ViewPendingFetchReport = ({ onBack }) => {
       case 'delivery_date':
         return formatDate(order.delivery_date);
       case 'amount':
-        return `₹ ${Number(order.total_amount || 0).toFixed(2)}`;
+        return `₹ ${Number(order.total_amount || 0).toLocaleString('en-IN', {
+          minimumFractionDigits: 2,
+        })}`;
       case 'executive':
         return order.executive?.toUpperCase();
       case 'status':
@@ -264,7 +254,7 @@ const ViewPendingFetchReport = ({ onBack }) => {
     if (loading && !hasFetched) {
       return (
         <div className="h-[70vh] flex items-center justify-center">
-          <div className="text-gray-500">Loading pending sales quotations...</div>
+          <div className="text-gray-500">Loading sales quotations...</div>
         </div>
       );
     }
@@ -286,54 +276,64 @@ const ViewPendingFetchReport = ({ onBack }) => {
     }
 
     return (
-      <div className="overflow-y-auto max-h-[79vh] text-xs font-amasis" ref={listContainerRef}>
+      <div
+        className="overflow-auto max-h-[79vh] text-xs font-amasis scrollbar-hide"
+        ref={listContainerRef}
+        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+      >
         {filteredOrders.length > 0 ? (
-          filteredOrders.map((order, rowIndex) => {
-            const isRowSelected = rowIndex === selectedRow;
-            return (
-              <div
-                key={order.id || order.order_no || rowIndex}
-                data-order-item
-                className={`flex justify-between items-center border-b border-gray-200 px-2 py-[2px] transition cursor-pointer ${
-                  isRowSelected
-                    ? 'bg-yellow-100 border-yellow-300'
-                    : rowIndex % 2 === 0
-                    ? 'bg-white hover:bg-blue-50'
-                    : 'bg-gray-100 hover:bg-blue-50'
-                }`}
-                onClick={() => {
-                  setSelectedRow(rowIndex);
-                  handleOrderClick(order);
-                }}
-              >
-                {columns.map((column, colIndex) => {
-                  const isCellSelected = isRowSelected && colIndex === selectedCol;
-                  return (
-                    <div
-                      key={column.key}
-                      className={`border-r border-gray-200 last:border-r-0 py-1 ${
-                        isCellSelected ? 'bg-blue-200 ring-2 ring-blue-500' : ''
-                      }`}
-                      style={{ width: column.width }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleCellClick(rowIndex, colIndex);
-                      }}
-                    >
-                      <div className={`${column.align === 'left' ? 'text-left' : column.align === 'center' ? 'text-center' : 'text-right'} ${
-                        column.key === 'customer_name' || column.key === 'executive' ? 'truncate' : ''
-                      }`} title={getCellValue(order, column.key)}>
-                        {getCellValue(order, column.key)}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })
+          <div className="min-w-[1400px]">
+            {filteredOrders.map((order, rowIndex) => {
+              const isRowSelected = rowIndex === selectedRow;
+              return (
+                <div
+                  key={order.id || order.order_no || rowIndex}
+                  data-order-item
+                  className={`flex items-center border-b border-gray-200 hover:bg-blue-300 transition cursor-pointer ${
+                    isRowSelected
+                      ? 'bg-yellow-100 border-yellow-300'
+                      : rowIndex % 2 === 0
+                      ? 'bg-white hover:bg-blue-50'
+                      : 'bg-gray-100 hover:bg-blue-50'
+                  }`}
+                  onClick={() => {
+                    setSelectedRow(rowIndex);
+                    handleOrderClick(order);
+                  }}
+                >
+                  {/* Single row with all elements */}
+                  <div className="flex items-center w-[1370px] px-1 py-0.5">
+                    {columns.map((column, colIndex) => {
+                      const isCellSelected = isRowSelected && colIndex === selectedCol;
+                      return (
+                        <div
+                          key={column.key}
+                          className={`border-r border-gray-200 last:border-r-0 ${
+                            isCellSelected ? 'bg-blue-200 ring-2 ring-blue-500' : ''
+                          }`}
+                          style={{ width: column.width }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCellClick(rowIndex, colIndex);
+                          }}
+                        >
+                          <div className={`${column.key === 'customer_name' || column.key === 'executive' ? 'px-1' : ''} ${
+                            column.align === 'left' ? 'text-left' : 
+                            column.align === 'center' ? 'text-center' : 'text-right'
+                          }`} title={getCellValue(order, column.key)}>
+                            {getCellValue(order, column.key)}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         ) : (
-          <div className="text-center text-gray-500 py-8">
-            {searchTerm ? 'No orders match your search.' : 'No pending sales quotations found.'}
+          <div className="text-center text-gray-500 py-8 min-w-[1400px]">
+            {searchTerm ? 'No orders match your search.' : 'No sales quotations found.'}
           </div>
         )}
       </div>
@@ -342,18 +342,18 @@ const ViewPendingFetchReport = ({ onBack }) => {
 
   return (
     <div className="flex">
-      <div className="w-[100%] h-[100vh] flex">
-        <div className="w-full">
-          <Title title={`Sales Quotation - Pending`} nav={onBack} />
+      <div className="w-full h-[100vh] flex">
+        <div className="w-full overflow-hidden">
+          <Title title="Sales Quotation" nav={onBack} />
 
           {/* Header Row: Title + Date Range + Search */}
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-gray-300 bg-white px-3 py-2">
-            {/* Left section — title */}
-            <div className="text-sm font-amasis text-gray-700">
-              List of All Pending Sales Quotations
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b-2 border-gray-300 bg-white px-4 py-3">
+            {/* Left section - title */}
+            <div className="text-sm font-amasis text-gray-700 whitespace-nowrap">
+              List of All Sales Quotations
             </div>
 
-            {/* Right section — search box */}
+            {/* Middle section - search box */}
             <div className="flex-1 min-w-[300px] max-w-[500px]">
               <input
                 type="text"
@@ -366,25 +366,34 @@ const ViewPendingFetchReport = ({ onBack }) => {
               />
             </div>
 
-            {/* Middle section — date range */}
-            <div className="text-sm whitespace-nowrap font-amasis">1-Apr-25 to 31-May-26</div>
+            {/* Right section - date range */}
+            <div className="text-sm font-amasis text-gray-600 whitespace-nowrap">
+              1-Apr-25 to 31-May-26
+            </div>
           </div>
 
-          {/* Column Headers */}
-          <div className="flex justify-between border-b-[1px] py-0.3 border-gray-300 bg-gray-100 font-amasis text-sm">
-            {columns.map((column, colIndex) => (
-              <div
-                key={column.key}
-                className={`border-r border-gray-300 last:border-r-0 ${
-                  selectedCol === colIndex && selectedRow === -1 ? 'bg-blue-200 ring-2 ring-blue-500' : ''
-                }`}
-                style={{ width: column.width }}
-              >
-                <div className={column.align === 'left' ? 'text-left pl-2' : column.align === 'center' ? 'text-center' : 'text-right pr-3'}>
-                  {column.label}
-                </div>
+          {/* Column Headers - Single Row */}
+          <div
+            className="overflow-auto scrollbar-hide"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          >
+            <div className="w-[1365px]">
+              <div className="flex items-center border-b border-gray-300 bg-gray-100 py-1 text-sm font-amasis text-gray-700">
+                {columns.map((column, colIndex) => (
+                  <div
+                    key={column.key}
+                    className={`border-r border-gray-300 last:border-r-0 ${
+                      selectedCol === colIndex && selectedRow === -1 ? 'bg-blue-200 ring-2 ring-blue-500' : ''
+                    }`}
+                    style={{ width: column.width }}
+                  >
+                    <div className={column.align === 'left' ? 'text-left' : column.align === 'center' ? 'text-center' : 'text-right'}>
+                      {column.label}
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
           </div>
 
           {/* Orders List */}
@@ -392,13 +401,21 @@ const ViewPendingFetchReport = ({ onBack }) => {
 
           {/* Results Summary */}
           {filteredOrders.length > 0 && (
-            <div className="border-t border-gray-300 bg-gray-50 py-2 px-3 font-amasis">
-              <div className="flex justify-between items-center text-xs text-gray-600">
-                <div>
-                  Showing {filteredOrders.length} of {allOrders.length} pending sales quotations
-                  {searchTerm && ` for "${searchTerm}"`}
+            <div
+              className="overflow-auto scrollbar-hide"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            >
+              <div className="min-w-[1400px] border-t border-gray-300 bg-gray-50 py-1 px-4 font-amasis">
+                <div className="flex justify-between items-center text-xs text-gray-600">
+                  <div>
+                    Showing {filteredOrders.length} of {allOrders.length} sales quotations
+                    {searchTerm && ` for "${searchTerm}"`}
+                  </div>
+                  <div className="font-medium text-gray-800 pr-9">
+                    Total: ₹{' '}
+                    {totalFilteredAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </div>
                 </div>
-                <div className="font-medium">Total: ₹ {totalFilteredAmount.toFixed(2)}</div>
               </div>
             </div>
           )}

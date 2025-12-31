@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import api from '../../services/api';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import Title from '../Title';
+import api from '../../services/api';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/authConstants';
 
 const ViewFetchCorporate = ({ onBack }) => {
@@ -11,20 +11,26 @@ const ViewFetchCorporate = ({ onBack }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [hasFetched, setHasFetched] = useState(false);
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [selectedRow, setSelectedRow] = useState(0);
+  const [selectedCol, setSelectedCol] = useState(0);
   const searchInputRef = useRef(null);
   const listContainerRef = useRef(null);
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const formatDate = dateString => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    const day = date.getDate().toString().padStart(2, '0');
-    const month = date.toLocaleString('en-IN', { month: 'short' });
-    const year = date.getFullYear().toString().slice(-2);
-    return `${day}-${month}-${year}`;
-  };
+  // Column configuration matching your existing structure
+  const columns = [
+    { key: 'date', label: 'Date', width: '80px', align: 'center' },
+    { key: 'voucher_type', label: 'Vch Type', width: '180px', align: 'left' },
+    { key: 'order_no', label: 'Vch No.', width: '120px', align: 'center' },
+    { key: 'customer_code', label: 'Code', width: '100px', align: 'center' },
+    { key: 'customer_name', label: 'Customer', width: '300px', align: 'left' },
+    { key: 'executive', label: 'Executive', width: '300px', align: 'left' },
+    { key: 'delivery_date', label: 'Dely. Date', width: '100px', align: 'left' },
+    { key: 'delivery_mode', label: 'Dely. Mode', width: '80px', align: 'left' },
+    { key: 'status', label: 'Status', width: '100px', align: 'left' },
+    { key: 'amount', label: 'Amount', width: '150px', align: 'right' }
+  ];
 
   // Filter orders based on search term
   const filterOrders = useCallback((orders, searchValue) => {
@@ -34,17 +40,25 @@ const ViewFetchCorporate = ({ onBack }) => {
     if (trimmedValue === '') return orders;
 
     return orders.filter(order => {
+      const voucherType = order.voucher_type?.toLowerCase() || '';
       const orderNo = order.order_no?.toString().toLowerCase() || '';
+      const customerCode = order.customer_code?.toLowerCase() || '';
       const customer = order.customer_name?.toLowerCase() || '';
       const executive = order.executive?.toLowerCase() || '';
+      const deliveryDate = formatDate(order.delivery_date)?.toLowerCase() || '';
+      const deliveryMode = order.delivery_mode?.toLowerCase() || '';
       const amount = order.total_amount?.toString().toLowerCase() || '';
       const status = order.status?.toLowerCase() || '';
       const createdAt = formatDate(order.created_at)?.toLowerCase() || '';
 
       return (
+        voucherType.includes(trimmedValue) ||
         orderNo.includes(trimmedValue) ||
+        customerCode.includes(trimmedValue) ||
         customer.includes(trimmedValue) ||
         executive.includes(trimmedValue) ||
+        deliveryDate.includes(trimmedValue) ||
+        deliveryMode.includes(trimmedValue) ||
         amount.includes(trimmedValue) ||
         status.includes(trimmedValue) ||
         createdAt.includes(trimmedValue)
@@ -52,32 +66,24 @@ const ViewFetchCorporate = ({ onBack }) => {
     });
   }, []);
 
-  // handle order click
-  const handleOrderClick = order => {
-    if (order.order_no) {
-      navigate(`/order-report-corporate/${order.order_no}`);
-    }
-  };
-
-  // keyboard navigation handler
   useEffect(() => {
     const handleKeyDown = e => {
       switch (e.key) {
         case 'ArrowUp':
           e.preventDefault();
-          setSelectedIndex(prev => {
-            const newIndex = Math.max(0, prev - 1);
-            scrollToItem(newIndex);
-            return newIndex;
-          });
+          setSelectedRow(prev => Math.max(0, prev - 1));
           break;
         case 'ArrowDown':
           e.preventDefault();
-          setSelectedIndex(prev => {
-            const newIndex = Math.min(filteredOrders.length - 1, prev + 1);
-            scrollToItem(newIndex);
-            return newIndex;
-          });
+          setSelectedRow(prev => Math.min(filteredOrders.length - 1, prev + 1));
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          setSelectedCol(prev => Math.max(0, prev - 1));
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          setSelectedCol(prev => Math.min(columns.length - 1, prev + 1));
           break;
         case 'Escape':
           e.preventDefault();
@@ -89,37 +95,54 @@ const ViewFetchCorporate = ({ onBack }) => {
           break;
         case 'Enter':
           e.preventDefault();
-          if (filteredOrders[selectedIndex]) {
-            handleOrderClick(filteredOrders[selectedIndex]);
+          if (filteredOrders[selectedRow]) {
+            handleOrderClick(filteredOrders[selectedRow]);
+          }
+          break;
+        case 'Home':
+          e.preventDefault();
+          if (e.ctrlKey) {
+            setSelectedRow(0);
+          } else {
+            setSelectedCol(0);
+          }
+          break;
+        case 'End':
+          e.preventDefault();
+          if (e.ctrlKey) {
+            setSelectedRow(filteredOrders.length - 1);
+          } else {
+            setSelectedCol(columns.length - 1);
           }
           break;
         default:
           break;
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
 
+    window.addEventListener('keydown', handleKeyDown);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [filteredOrders, selectedIndex, navigate, onBack]);
+  }, [filteredOrders, selectedRow, selectedCol, navigate, onBack, columns.length]);
 
-  // scroll to selected item
-  const scrollToItem = index => {
-    if (listContainerRef.current) {
+  // Scroll to selected row
+  useEffect(() => {
+    if (listContainerRef.current && selectedRow >= 0) {
       const items = listContainerRef.current.querySelectorAll('[data-order-item]');
-      if (items[index]) {
-        items[index].scrollIntoView({
+      if (items[selectedRow]) {
+        items[selectedRow].scrollIntoView({
           behavior: 'smooth',
           block: 'nearest',
         });
       }
     }
-  };
+  }, [selectedRow]);
 
-  // Reset selected index when filtered orders change
+  // Reset selected index when filter orders change
   useEffect(() => {
-    setSelectedIndex(0);
+    setSelectedRow(0);
+    setSelectedCol(0);
   }, [filteredOrders]);
 
   // Fetch orders
@@ -134,16 +157,15 @@ const ViewFetchCorporate = ({ onBack }) => {
         const response = await api.get('/orders');
         const ordersData = response.data;
 
-        // current loggedin user
         const currentCorporateUsername = user?.customer_name.toLowerCase() || user?.displayName.toLowerCase() || '';
 
-        // get unique orders by order_no
+        // Get unique pending orders by order_no
         const pendingUniqueOrders = ordersData
           .filter(
             order => {
               const hasCorporateRole = order.role && order.role === 'direct';
-              const matchesCurrentUser = order.executive && order.executive.toLowerCase() === currentCorporateUsername
-              
+              const matchesCurrentUser = order.executive && order.executive.toLowerCase() === currentCorporateUsername;
+
               return hasCorporateRole && matchesCurrentUser;
             }
           )
@@ -152,8 +174,8 @@ const ViewFetchCorporate = ({ onBack }) => {
             if (!existingOrder) {
               acc.push(current);
             }
-            return acc;
-          }, []);
+          return acc;
+        }, []);
 
         setAllOrders(pendingUniqueOrders);
         setFilteredOrders(pendingUniqueOrders);
@@ -168,10 +190,11 @@ const ViewFetchCorporate = ({ onBack }) => {
         setLoading(false);
       }
     };
+
     fetchOrders();
   }, [hasFetched]);
 
-  // apply search filter when search term changes
+  // Apply search filter when search term changes
   useEffect(() => {
     if (allOrders.length > 0) {
       const filtered = filterOrders(allOrders, searchTerm);
@@ -179,7 +202,7 @@ const ViewFetchCorporate = ({ onBack }) => {
     }
   }, [searchTerm, allOrders, filterOrders]);
 
-  // Focus search input on amount
+  // Focus search input on mount
   useEffect(() => {
     if (searchInputRef.current) {
       searchInputRef.current.focus();
@@ -190,7 +213,49 @@ const ViewFetchCorporate = ({ onBack }) => {
     setSearchTerm(e.target.value);
   };
 
-  // calcualte total amount of filtered orders
+  const formatDate = dateString => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = date.toLocaleString('en-IN', { month: 'short' });
+    const year = date.getFullYear().toString().slice(-2);
+    return `${day}-${month}-${year}`;
+  };
+
+  // Handle order click
+  const handleOrderClick = order => {
+    if (order.order_no) {
+      navigate(`/order-report-corporate/${order.order_no}`);
+    }
+  };
+
+  // Handle cell click
+  const handleCellClick = (rowIndex, colIndex) => {
+    setSelectedRow(rowIndex);
+    setSelectedCol(colIndex);
+  };
+
+  // Get cell value based on column key
+  const getCellValue = (order, columnKey) => {
+    switch (columnKey) {
+      case 'date':
+        return formatDate(order.created_at);
+      case 'delivery_date':
+        return formatDate(order.delivery_date);
+      case 'amount':
+        return `₹ ${Number(order.total_amount || 0).toLocaleString('en-IN', {
+          minimumFractionDigits: 2,
+        })}`;
+      case 'executive':
+        return order.executive?.toUpperCase();
+      case 'status':
+        return order.status?.toUpperCase();
+      default:
+        return order[columnKey] || '';
+    }
+  };
+
+  // Calculate total amount of filtered orders
   const totalFilteredAmount = filteredOrders.reduce((total, order) => {
     return total + (Number(order.total_amount) || 0);
   }, 0);
@@ -222,36 +287,63 @@ const ViewFetchCorporate = ({ onBack }) => {
     }
 
     return (
-      <div className="overflow-y-auto max-h-[79vh] text-xs font-amasis" ref={listContainerRef}>
+      <div
+        className="overflow-auto max-h-[79vh] text-xs font-amasis scrollbar-hide"
+        ref={listContainerRef}
+        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+      >
         {filteredOrders.length > 0 ? (
-          filteredOrders.map((order, index) => {
-            const isSelected = index === selectedIndex;
-            return (
-              <div
-                key={order.id || order.order_no || index}
-                data-order-item
-                className={`flex justify-between items-center border-b border-gray-200 px-2 py-[2px] transition cursor-pointer ${
-                  isSelected
-                    ? 'bg-yellow-100 border-yellow-300'
-                    : index % 2 === 0
-                    ? 'bg-white hover:bg-blue-50'
-                    : 'bg-gray-100 hover:bg-blue-50'
-                }`}
-                onClick={() => {
-                  setSelectedIndex(index);
-                  handleOrderClick(order);
-                }}
-              >
-                <div className='w-[15%] text-left'>{formatDate(order.created_at)}</div>
-                <div className='w-[20%] text-center'>{order.order_no}</div>
-                <div className='w-[35%] text-left truncate' title={order.customer_name}>{order.customer_name}</div>
-                <div className='w-[15%] text-center truncate'>{order.status.toUpperCase()}</div>
-                <div className='w-[20%] text-right pr-1'>₹ {Number(order.total_amount || 0).toFixed(2)}</div>
-              </div>
-            );
-          })
+          <div className="min-w-[1400px]">
+            {filteredOrders.map((order, rowIndex) => {
+              const isRowSelected = rowIndex === selectedRow;
+              return (
+                <div
+                  key={order.id || order.order_no || rowIndex}
+                  data-order-item
+                  className={`flex items-center border-b border-gray-200 hover:bg-blue-300 transition cursor-pointer ${
+                    isRowSelected
+                      ? 'bg-yellow-100 border-yellow-300'
+                      : rowIndex % 2 === 0
+                      ? 'bg-white hover:bg-blue-50'
+                      : 'bg-gray-100 hover:bg-blue-50'
+                  }`}
+                  onClick={() => {
+                    setSelectedRow(rowIndex);
+                    handleOrderClick(order);
+                  }}
+                >
+                  {/* Single row with all elements */}
+                  <div className="flex items-center w-[1370px] px-1 py-0.5">
+                    {columns.map((column, colIndex) => {
+                      const isCellSelected = isRowSelected && colIndex === selectedCol;
+                      return (
+                        <div
+                          key={column.key}
+                          className={`border-r border-gray-200 last:border-r-0 ${
+                            isCellSelected ? 'bg-blue-200 ring-2 ring-blue-500' : ''
+                          }`}
+                          style={{ width: column.width }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCellClick(rowIndex, colIndex);
+                          }}
+                        >
+                          <div className={`${column.key === 'customer_name' || column.key === 'executive' ? 'px-1' : ''} ${
+                            column.align === 'left' ? 'text-left' : 
+                            column.align === 'center' ? 'text-center' : 'text-right'
+                          }`} title={getCellValue(order, column.key)}>
+                            {getCellValue(order, column.key)}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         ) : (
-          <div className="text-center text-gray-500 py-8">
+          <div className="text-center text-gray-500 py-8 min-w-[1400px]">
             {searchTerm ? 'No orders match your search.' : 'No sales quotations found.'}
           </div>
         )}
@@ -261,41 +353,58 @@ const ViewFetchCorporate = ({ onBack }) => {
 
   return (
     <div className="flex">
-      <div className="w-[100%] h-[100vh] flex">
-        <div className="w-full">
-          <Title title={`Sales Quotation - Direct Order`} nav={onBack} />
+      <div className="w-full h-[100vh] flex">
+        <div className="w-full overflow-hidden">
+          <Title title="Sales Quotation" nav={onBack} />
 
-          {/* Header row: Title + Date Range + Search */}
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-gray-300 bg-white px-3 py-2">
+          {/* Header Row: Title + Date Range + Search */}
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b-2 border-gray-300 bg-white px-4 py-3">
             {/* Left section - title */}
-            <div className="text-sm font-amasis text-gray-700">
-              List of All Direct-Order Sales Quotation
+            <div className="text-sm font-amasis text-gray-700 whitespace-nowrap">
+              List of All Sales Quotations
             </div>
 
-            {/* Right section - search box */}
-            <div className="w-full sm:w-auto">
+            {/* Middle section - search box */}
+            <div className="flex-1 min-w-[300px] max-w-[500px]">
               <input
                 type="text"
                 placeholder="Search by order no, customer, executive, amount, or date..."
                 value={searchTerm}
                 ref={searchInputRef}
                 onChange={handleSearchChange}
-                className="w-full sm:w-80 h-8 px-3 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-amasis"
+                className="w-full h-8 px-3 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-amasis"
                 autoComplete="off"
               />
             </div>
 
-            {/* Middle section -  date range */}
-            <div className="text-sm whitespace-nowrap font-amasis">1-Apr-25 to 31-May-26</div>
+            {/* Right section - date range */}
+            <div className="text-sm font-amasis text-gray-600 whitespace-nowrap">
+              1-Apr-25 to 31-May-26
+            </div>
           </div>
 
-          {/* Column Headers */}
-          <div className="flex justify-between border-b-[1px] py-0.3 border-gray-300 bg-gray-100 font-amasis">
-            <div className="w-[15%] text-left pl-2">Date</div>
-            <div className="w-[20%] text-center">Vch No.</div>
-            <div className="w-[35%] text-left">Customer</div>
-            <div className="w-[15%] text-center">Status</div>
-            <div className="w-[20%] text-right pr-3">Amount</div>
+          {/* Column Headers - Single Row */}
+          <div
+            className="overflow-auto scrollbar-hide"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          >
+            <div className="w-[1365px]">
+              <div className="flex items-center border-b border-gray-300 bg-gray-100 py-1 text-sm font-amasis text-gray-700">
+                {columns.map((column, colIndex) => (
+                  <div
+                    key={column.key}
+                    className={`border-r border-gray-300 last:border-r-0 ${
+                      selectedCol === colIndex && selectedRow === -1 ? 'bg-blue-200 ring-2 ring-blue-500' : ''
+                    }`}
+                    style={{ width: column.width }}
+                  >
+                    <div className={column.align === 'left' ? 'text-left' : column.align === 'center' ? 'text-center' : 'text-right'}>
+                      {column.label}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
 
           {/* Orders List */}
@@ -303,13 +412,21 @@ const ViewFetchCorporate = ({ onBack }) => {
 
           {/* Results Summary */}
           {filteredOrders.length > 0 && (
-            <div className="border-t border-gray-300 bg-gray-50 py-2 px-3 font-amasis">
-              <div className="flex justify-between items-center text-xs text-gray-600">
-                <div>
-                  Showing {filteredOrders.length} of {allOrders.length} direct-order sales
-                  quotations {searchTerm && ` for "${searchTerm}"`}
+            <div
+              className="overflow-auto scrollbar-hide"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            >
+              <div className="min-w-[1400px] border-t border-gray-300 bg-gray-50 py-1 px-4 font-amasis">
+                <div className="flex justify-between items-center text-xs text-gray-600">
+                  <div>
+                    Showing {filteredOrders.length} of {allOrders.length} sales quotations
+                    {searchTerm && ` for "${searchTerm}"`}
+                  </div>
+                  <div className="font-medium text-gray-800 pr-9">
+                    Total: ₹{' '}
+                    {totalFilteredAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </div>
                 </div>
-                <div className="font-medium">Total: ₹ {totalFilteredAmount.toFixed(2)}</div>
               </div>
             </div>
           )}

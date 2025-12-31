@@ -1,6 +1,8 @@
 const OrderFooter = ({
   remarks,
   setRemarks,
+  status,
+  setStatus,
   totals,
   handleSubmit,
   isSubmitting,
@@ -8,6 +10,8 @@ const OrderFooter = ({
   handleRemarksKeyDown,
   isDistributorReport,
   isCorporateReport,
+  isDistributorOrder,
+  isDirectOrder,
 }) => {
 
   // Add this for debugging
@@ -28,16 +32,22 @@ const OrderFooter = ({
                 value={remarks}
                 onChange={e => setRemarks(e.target.value)}
                 onKeyDown={handleRemarksKeyDown}
-                className="border border-[#932F67] resize-none md:w-[350px] outline-none rounded px-1 peer h-[26px] bg-[#F8F4EC] mb-1 ml-1"
+                className="border border-[#932F67] resize-none md:w-[320px] outline-none rounded px-1 peer h-[26px] bg-[#F8F4EC] mb-1 ml-1"
               ></textarea>
 
-              <div className="w-[300px]">
+              <div className="w-[320px]">
                 <label className="text-sm font-medium ml-3">Status : </label>
                 <select
-                  disabled={true}
+                name="status"
+                id="status"
+                value={status}
+                onChange={e => setStatus(e.target.value)}
+                  disabled={isDistributorOrder || isDirectOrder || isDistributorReport || isCorporateReport}
                   className="outline-none appearance-none border border-[#932F67] px-1 text-sm rounded ml-1 mt-0.5"
                 >
-                  <option value="">Pending</option>
+                  <option value="pending">Pending</option>
+                  <option value="approved">Approved</option>
+                  <option value="rejected">Rejected</option>
                 </select>
               </div>
             </div>
@@ -56,7 +66,7 @@ const OrderFooter = ({
                   <FooterCell>{formatCurrency(totals?.sgstAmt)}</FooterCell>
                   <FooterCell>{formatCurrency(totals?.cgstAmt)}</FooterCell>
                   <FooterCell>{formatCurrency(totals?.igstAmt)}</FooterCell>
-                  <FooterCell>{formatCurrency(totals?.totalAmount)}</FooterCell>
+                  <FooterCell>{formatCurrency(totals?.calculatedTotalAmount)}</FooterCell>
                 </tr>
               </tfoot>
             </table>

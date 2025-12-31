@@ -16,7 +16,6 @@ import { useOrderFormHook } from './useOrderFormHook';
 
 const NewOrder = ({ onBack }) => {
   const { orderNumberFetch } = useParams();
-
   // Use the custom hook
   const {
     date,
@@ -229,8 +228,6 @@ const NewOrder = ({ onBack }) => {
 
 // calculate totals - ALWAYS calculate dynamically, even in update mode
 const totals = useMemo(() => {
-  // For update mode, we should still calculate dynamically based on current data
-  // Only use dbTotals if we have no orderData (initial load)
   if (mode === 'update' && dbTotals && orderData.length === 0) {
     console.log('Initial load - Using database totals:', dbTotals);
     return {
@@ -250,7 +247,7 @@ const totals = useMemo(() => {
   console.log('Calculating dynamic totals for mode:', mode, 'Order data length:', orderData.length);
   
   let totalQty = 0;
-  let totalBaseAmount = 0; // Amount before discounts
+  let totalBaseAmount = 0; // Amount before discounts(qty * rate)
   let totalDiscAmt = 0;
   let totalSplDiscAmt = 0;
   let totalSgstAmt = 0;
@@ -850,11 +847,15 @@ useEffect(() => {
       <OrderFooter
         remarks={remarks}
         setRemarks={setRemarks}
+        status={status}
+        setStatus={setStatus}
         totals={totals}
         handleSubmit={handlePrimaryAction}
         isSubmitting={isSubmitting}
         formatCurrency={formatCurrency}
         handleRemarksKeyDown={handleRemarksKeyDown}
+        isDistributorOrder={isDistributorOrder}
+        isDirectOrder={isDirectOrder}
         isViewOnlyReport={isViewOnlyReport}
         isDistributorReport={isDistributorReport}
         isCorporateReport={isCorporateReport}
