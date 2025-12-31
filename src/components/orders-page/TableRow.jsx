@@ -99,7 +99,6 @@ const TableRow = ({
           }
           getOptionValue={option => option.item_code}
           onChange={selected => handleItemSelect(selected, rowIndex)}
-          // onKeyDown={e => handleKeyDownTable(e, rowIndex, 1, 'select')}
           onKeyDown={e => handleSelectKeyDown(e, rowIndex, 1, row.item)}
           placeholder=""
           styles={tableSelectStyles}

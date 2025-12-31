@@ -78,7 +78,6 @@ const EditingRow = ({
           }
           getOptionValue={option => option.item_code}
           onChange={selected => handleItemSelect(selected)}
-          // onKeyDown={e => handleKeyDown(e, 1, 'select')}
           onKeyDown={e => handleSelectKeyDown(e, orderData.length, 1, editingRow.item)}
           placeholder=""
           styles={tableSelectStyles}

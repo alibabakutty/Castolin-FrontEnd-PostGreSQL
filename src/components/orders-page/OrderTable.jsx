@@ -605,7 +605,7 @@ const OrderTable = ({
     if (prevRow < 0) return;
 
     setTimeout(() => {
-      const lastCol = showDiscountColumns() ? 16 : 14;
+      const lastCol = showDiscountColumns() ? 16 : 16;
 
       if (prevRow === totalRows - 1) {
         // Editing row last column
@@ -1072,7 +1072,7 @@ const handleDeleteButtonKeyDown = (e, rowIndex) => {
   } else if (key === 'ArrowLeft') {
     e.preventDefault();
     // Move to previous column (Delivery Mode)
-    const prevCol = showDiscountColumns() ? 15 : 13;
+    const prevCol = showDiscountColumns() ? 15 : 15;
     setTimeout(() => {
       const actualColIndex = getActualColumnIndex(prevCol);
       if (actualColIndex !== -1) {
