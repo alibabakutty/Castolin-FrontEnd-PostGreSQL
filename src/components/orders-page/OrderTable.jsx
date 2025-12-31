@@ -445,19 +445,19 @@ const OrderTable = ({
       item: editingRow.item,
       itemCode: editingRow.item.item_code,
       itemName: editingRow.item.stock_item_name,
-      disc: editingRow.disc || '0',
+      disc: editingRow.disc || '',
       discAmt: parseFloat(finalRow.discAmt) || 0,
-      splDisc: editingRow.splDisc || '0',
+      splDisc: editingRow.splDisc || '',
       splDiscAmt: parseFloat(finalRow.splDiscAmt) || 0,
       hsn: editingRow.hsn || editingRow.item.hsn_code || '',
-      gst: editingRow.gst || '18',
+      gst: editingRow.gst || '',
       sgst: parseFloat(finalRow.sgst) || 0,
       cgst: parseFloat(finalRow.cgst) || 0,
       igst: parseFloat(finalRow.igst) || 0,
       delivery_date: editingRow.delivery_date,
       delivery_mode: editingRow.delivery_mode,
       itemQty: quantityNum,
-      uom: editingRow.item.uom || 'Nos',
+      uom: editingRow.item.uom || '',
       rate: rateValue,
       amount: parseFloat(finalRow.amount) || 0,
       netRate: parseFloat(finalRow.netRate) || 0,
@@ -556,11 +556,69 @@ const OrderTable = ({
     showDiscountColumns: showDiscountColumns(),
   });
 
+  // Add this separate handler for select inputs
+const handleSelectKeyDown = (e, rowIndex, colIndex) => {
+  const key = e.key;
+  const totalRows = orderData.length + 1;
+  
+  if (key === 'Enter' || key === 'Tab') {
+    
+  } else if (key === 'ArrowRight') {
+    e.preventDefault();
+    // Move to next column (Product Name)
+    setTimeout(() => {
+      if (rowIndex === totalRows - 1) {
+        // Editing row
+        editingRowInputRefs.current.itemName?.focus();
+      } else {
+        // Existing row
+        const actualColIndex = getActualColumnIndex(2); // Product Name column
+        if (actualColIndex !== -1) {
+          const refIndex = rowIndex * totalCols + actualColIndex;
+          inputRefs.current[refIndex]?.focus();
+        }
+      }
+    }, 0);
+  } else if (key === 'ArrowLeft' || key === 'Backspace') {
+    e.preventDefault();
+    // Move to previous row's last input field
+    let prevRow = rowIndex - 1;
+    if (prevRow >= 0) {
+      setTimeout(() => {
+        if (prevRow === totalRows - 1) {
+          // Moving to editing row's last column
+          const lastCol = showDiscountColumns() ? 15 : 13; // Delivery Mode column
+          editingRowInputRefs.current.delivery_mode?.focus();
+        } else {
+          // Moving to previous row's last input field
+          const lastCol = showDiscountColumns() ? 15 : 13; // Delivery Mode column
+          const actualColIndex = getActualColumnIndex(lastCol);
+          if (actualColIndex !== -1) {
+            const refIndex = prevRow * totalCols + actualColIndex;
+            inputRefs.current[refIndex]?.focus();
+          }
+        }
+      }, 0);
+    }
+  } else if (key === 'ArrowDown') {
+    
+  } else if (key === 'ArrowUp') {
+    
+  }
+};
+
   // Handler specifically for editing row
-  const handleEditingRowKeyDown = (e, colIndex, fieldType = 'input') => {
-    const rowIndex = orderData.length; // Editing row is always last
+const handleEditingRowKeyDown = (e, colIndex, fieldType = 'input') => {
+  const rowIndex = orderData.length;
+  
+  if (colIndex === 1 && fieldType === 'select') {
+    // Special handling for editing row select
+    handleSelectKeyDown(e, rowIndex, colIndex);
+  } else {
+    // Regular handling for other fields
     handleKeyDownTable(e, rowIndex, colIndex, fieldType);
-  };
+  }
+};
 
   // Enhanced keyboard navigation handler with validation and column skipping
   const handleKeyDownTable = (e, rowIndex, colIndex, fieldType = 'input') => {
@@ -840,19 +898,68 @@ const OrderTable = ({
     // Handle key events
     if (key === 'Enter' || key === 'Tab') {
       e.preventDefault();
-      moveToNextCell();
+      moveToNextCell(rowIndex, colIndex);
     } else if (key === 'ArrowRight') {
       e.preventDefault();
-      moveToNextCell();
+      moveToNextCell(rowIndex, colIndex);
     } else if (key === 'ArrowLeft' || key === 'Backspace') {
       e.preventDefault();
       moveToPrevCell();
     } else if (key === 'ArrowDown') {
       e.preventDefault();
-      handleArrowDown();
+      e.preventDefault();
+    // Move to same column in next row
+    let nextRow = rowIndex + 1;
+    if (nextRow < totalRows) {
+      setTimeout(() => {
+        if (nextRow === totalRows - 1) {
+          // Moving to editing row
+          const fieldMap = getEditingRowFieldMap();
+          const field = fieldMap[colIndex];
+          if (field && editingRowInputRefs.current[field]) {
+            editingRowInputRefs.current[field].focus();
+          }
+        } else {
+          // Moving to next row
+          const actualColIndex = getActualColumnIndex(colIndex);
+          if (actualColIndex !== -1) {
+            const refIndex = nextRow * totalCols + actualColIndex;
+            if (colIndex === 1) {
+              selectRefs.current[refIndex]?.focus();
+            } else {
+              inputRefs.current[refIndex]?.focus();
+            }
+          }
+        }
+      }, 0);
+    }
     } else if (key === 'ArrowUp') {
       e.preventDefault();
-      handleArrowUp();
+    // Move to same column in previous row
+    let prevRow = rowIndex - 1;
+    if (prevRow >= 0) {
+      setTimeout(() => {
+        if (prevRow === totalRows - 1) {
+          // Moving to editing row
+          const fieldMap = getEditingRowFieldMap();
+          const field = fieldMap[colIndex];
+          if (field && editingRowInputRefs.current[field]) {
+            editingRowInputRefs.current[field].focus();
+          }
+        } else {
+          // Moving to previous row
+          const actualColIndex = getActualColumnIndex(colIndex);
+          if (actualColIndex !== -1) {
+            const refIndex = prevRow * totalCols + actualColIndex;
+            if (colIndex === 1) {
+              selectRefs.current[refIndex]?.focus();
+            } else {
+              inputRefs.current[refIndex]?.focus();
+            }
+          }
+        }
+      }, 0);
+    }
     }
   };
 
@@ -1099,6 +1206,7 @@ const getEditingRowFieldMap = () => {
                       getActualColumnIndex={getActualColumnIndex}
                       rowBaseIndex={rowBaseIndex}
                       isDeleted={row._deleted || row._markedForDeletion} // Add this prop
+                      handleSelectKeyDown={handleSelectKeyDown}
                     />
                   );
                 })}
@@ -1129,6 +1237,7 @@ const getEditingRowFieldMap = () => {
                   rowIndex={editingRowIndex}
                   rowBaseIndex={editingRowBaseIndex}
                   orderData={orderData}
+                  handleSelectKeyDown={handleSelectKeyDown}
                 />
               )}
 

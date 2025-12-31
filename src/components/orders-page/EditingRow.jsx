@@ -26,6 +26,7 @@ const EditingRow = ({
   rowIndex,
   orderData,
   rowBaseIndex,
+  handleSelectKeyDown,
 }) => {
   const handleRateFocus = () => {
     setFocusedRateFields(prev => ({
@@ -78,6 +79,7 @@ const EditingRow = ({
           getOptionValue={option => option.item_code}
           onChange={selected => handleItemSelect(selected)}
           // onKeyDown={e => handleKeyDown(e, 1, 'select')}
+          onKeyDown={e => handleSelectKeyDown(e, 1, 'select')}
           placeholder=""
           styles={tableSelectStyles}
           components={{ DropdownIndicator: () => null, IndicatorSeparator: () => null }}
@@ -128,7 +130,7 @@ const EditingRow = ({
           ref={el => (editingRowInputRefs.current.uom = el)}
           type="text"
           readOnly
-          value={editingRow.item?.uom || "Nos"}
+          value={editingRow.item?.uom || ""}
           className="w-full h-full text-center focus:bg-yellow-200 focus:outline-none focus:border-blue-500 focus:border border-transparent"
           onKeyDown={e => handleKeyDown(e, 4)}
         />

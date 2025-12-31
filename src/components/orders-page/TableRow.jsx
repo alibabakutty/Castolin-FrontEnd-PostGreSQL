@@ -27,6 +27,7 @@ const TableRow = ({
   getActualColumnIndex,
   rowBaseIndex,
   isDeleted = false,
+  handleSelectKeyDown,
 }) => {
   const handleRateFocus = () => {
     setFocusedRateFields(prev => ({
@@ -99,6 +100,7 @@ const TableRow = ({
           getOptionValue={option => option.item_code}
           onChange={selected => handleItemSelect(selected, rowIndex)}
           // onKeyDown={e => handleKeyDownTable(e, rowIndex, 1, 'select')}
+          onKeyDown={e => handleSelectKeyDown(e, rowIndex, 1, 'select')}
           placeholder=""
           styles={tableSelectStyles}
           components={{
