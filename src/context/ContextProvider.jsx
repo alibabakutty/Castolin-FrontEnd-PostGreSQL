@@ -213,7 +213,6 @@ const ContextProvider = ({ children }) => {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      const userData = res.data[0] || {};
       const role = res.data[0]?.role || null;
       const stateValue = res.data[0]?.state || null;
 

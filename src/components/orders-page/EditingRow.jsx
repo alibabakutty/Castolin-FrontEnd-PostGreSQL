@@ -17,15 +17,10 @@ const EditingRow = ({
   handleEditingRowKeyDown,
   handleDateBlur,
   handleAddButtonKeyDown,
-  isDistributorOrder,
-  isDirectOrder,
   isDistributorReport,
   isCorporateReport,
   showDiscountColumns,
-  getActualColumnIndex,
-  rowIndex,
   orderData,
-  rowBaseIndex,
   handleSelectKeyDown,
 }) => {
   const handleRateFocus = () => {

@@ -602,7 +602,9 @@ const OrderTable = ({
     e.preventDefault();
 
     const prevRow = rowIndex - 1;
-    if (prevRow < 0) return;
+    if (prevRow < 0) {
+      return; // No previous row
+    };
 
     setTimeout(() => {
       const lastCol = showDiscountColumns() ? 16 : 16;
@@ -636,7 +638,7 @@ const handleEditingRowKeyDown = (e, colIndex, fieldType = 'input') => {
 };
 
   // Enhanced keyboard navigation handler with validation and column skipping
-  const handleKeyDownTable = (e, rowIndex, colIndex, fieldType = 'input') => {
+  const handleKeyDownTable = (e, rowIndex, colIndex) => {
     const key = e.key;
     // Calculate total rows including editing row
     const totalRows = orderData.length + 1; // +1 for editing row
@@ -743,8 +745,7 @@ const handleEditingRowKeyDown = (e, colIndex, fieldType = 'input') => {
       // Check validation based on current column
       let shouldPreventNavigation = false;
 
-      if (colIndex === 3) {
-      } else if (colIndex === 14) {
+      if (colIndex === 14) {
         // Delivery Date column
         const dateStr = currentRowData.delivery_date || '';
 
@@ -844,67 +845,6 @@ const handleEditingRowKeyDown = (e, colIndex, fieldType = 'input') => {
           } else {
             // Moving within existing rows backward
             focusExistingRow(prevRow, prevCol);
-          }
-        }, 0);
-      }
-    };
-
-    // Handle arrow down
-    const handleArrowDown = () => {
-      // Check validation before moving down
-      const currentRowData = rowIndex === totalRows - 1 ? editingRow : orderData[rowIndex];
-      let shouldPreventNavigation = false;
-
-      if (colIndex === 3) {
-      } else if (colIndex === 14) {
-        // Delivery Date column
-        if (!currentRowData.delivery_date || currentRowData.delivery_date.trim() === '') {
-          shouldPreventNavigation = true;
-          toast.error('Please enter delivery date before proceeding!', {
-            position: 'bottom-right',
-            autoClose: 3000,
-          });
-        }
-      } else if (colIndex === 15) {
-        // Delivery Mode column
-        if (!currentRowData.delivery_mode || currentRowData.delivery_mode.trim() === '') {
-          shouldPreventNavigation = true;
-          toast.error('Please enter delivery mode before proceeding!', {
-            position: 'bottom-right',
-            autoClose: 3000,
-          });
-        }
-      }
-
-      if (shouldPreventNavigation) {
-        return;
-      }
-
-      let nextRow = rowIndex + 1;
-      if (nextRow < totalRows) {
-        setTimeout(() => {
-          if (nextRow === totalRows - 1) {
-            // Moving down to editing row
-            focusEditingRow(colIndex);
-          } else {
-            // Moving down within existing rows
-            focusExistingRow(nextRow, colIndex);
-          }
-        }, 0);
-      }
-    };
-
-    // Handle arrow up
-    const handleArrowUp = () => {
-      let prevRow = rowIndex - 1;
-      if (prevRow >= 0) {
-        setTimeout(() => {
-          if (prevRow === totalRows - 1) {
-            // Moving up to editing row from below
-            focusEditingRow(colIndex);
-          } else {
-            // Moving up within existing rows
-            focusExistingRow(prevRow, colIndex);
           }
         }, 0);
       }
@@ -1150,10 +1090,6 @@ const getEditingRowFieldMap = () => {
   return fieldMap;
 };
 
-  // Calculate editing row indices
-  const editingRowIndex = orderData.length;
-  const editingRowBaseIndex = editingRowIndex * totalCols;
-
   return (
     <div className="mt-1 border h-[76vh]">
       <div className="h-[75vh] flex flex-col">
@@ -1209,12 +1145,9 @@ const getEditingRowFieldMap = () => {
                       formatCurrency={formatCurrency}
                       inputRefs={inputRefs}
                       selectRefs={selectRefs}
-                      totalCols={totalCols}
                       formResetKey={formResetKey}
                       handleKeyDownTable={handleKeyDownTable}
                       handleDateBlur={handleDateBlur}
-                      isDistributorOrder={isDistributorOrder}
-                      isDirectOrder={isDirectOrder}
                       isDistributorReport={isDistributorReport}
                       isCorporateReport={isCorporateReport}
                       showDiscountColumns={showDiscountColumns()}
@@ -1243,14 +1176,9 @@ const getEditingRowFieldMap = () => {
                   handleDateBlur={handleDateBlur}
                   handleEditingRowKeyDown={handleEditingRowKeyDown}
                   handleAddButtonKeyDown={handleAddButtonKeyDown}
-                  isDistributorOrder={isDistributorOrder}
-                  isDirectOrder={isDirectOrder}
                   isDistributorReport={isDistributorReport}
                   isCorporateReport={isCorporateReport}
                   showDiscountColumns={showDiscountColumns()}
-                  getActualColumnIndex={getActualColumnIndex}
-                  rowIndex={editingRowIndex}
-                  rowBaseIndex={editingRowBaseIndex}
                   orderData={orderData}
                   handleSelectKeyDown={handleSelectKeyDown}
                 />

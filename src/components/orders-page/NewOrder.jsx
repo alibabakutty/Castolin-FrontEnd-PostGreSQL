@@ -32,8 +32,6 @@ const NewOrder = ({ onBack }) => {
     setSelectedCustomer,
     showRowValueRows,
     setShowRowValueRows,
-    originalOrderData,
-    setOriginalOrderData,
     editingRow,
     setEditingRow,
     voucherType,
@@ -42,8 +40,6 @@ const NewOrder = ({ onBack }) => {
     setExecutiveName,
     status,
     setStatus,
-    loading,
-    setLoading,
     isSubmitting,
     setIsSubmitting,
     formResetKey,
@@ -53,7 +49,6 @@ const NewOrder = ({ onBack }) => {
     isDirectRoute,
     isCorporateReport,
     isDistributorReport,
-    isApprovedReport,
     isReportRoute,
     isViewOnlyReport,
     location,
@@ -89,12 +84,17 @@ const NewOrder = ({ onBack }) => {
     }
   };
 
+  useEffect(() => {
+    // Show rows only when we have data or are in create mode
+    const shouldShowRows = orderData.length > 0 || mode === 'create';
+    setShowRowValueRows(shouldShowRows);
+  }, [orderData.length, mode]);
+
   // Fetch order details
   useEffect(() => {
     if (mode !== 'update') return;
 
     const fetchOrderDetails = async () => {
-      setLoading(true);
       try {
         const response = await api.get(`orders-by-number/${orderNumberFetch}`);
         const fetchedOrderData = response.data;
@@ -102,7 +102,6 @@ const NewOrder = ({ onBack }) => {
         if (fetchedOrderData?.length) {
           const transformedData = transformOrderData(fetchedOrderData);
           setOrderData(transformedData);
-          setOriginalOrderData(transformedData);
 
           // Log to check what GST type the fetched data has
           transformedData.forEach((row, index) => {
@@ -141,9 +140,7 @@ const NewOrder = ({ onBack }) => {
           toast.error('No data found for this order.');
         }
       } catch (error) {
-        toast.error('Failed to load order details.');
-      } finally {
-        setLoading(false);
+        toast.error('Failed to load order details.', error);
       }
     };
 
@@ -226,155 +223,164 @@ const NewOrder = ({ onBack }) => {
     });
   }, [userRole, isDistributorRoute, selectedCustomer, distributorUser, isTamilNaduState]);
 
-// calculate totals - ALWAYS calculate dynamically, even in update mode
-const totals = useMemo(() => {
-  if (mode === 'update' && dbTotals && orderData.length === 0) {
-    console.log('Initial load - Using database totals:', dbTotals);
+  // calculate totals - ALWAYS calculate dynamically, even in update mode
+  const totals = useMemo(() => {
+    if (mode === 'update' && dbTotals && orderData.length === 0) {
+      console.log('Initial load - Using database totals:', dbTotals);
+      return {
+        qty: parseFloat(dbTotals.qty) || 0,
+        amount: parseFloat(dbTotals.amount) || 0,
+        discAmt: parseFloat(dbTotals.discAmt) || 0,
+        splDiscAmt: parseFloat(dbTotals.splDiscAmt) || 0,
+        sgstAmt: parseFloat(dbTotals.sgstAmt) || 0,
+        cgstAmt: parseFloat(dbTotals.cgstAmt) || 0,
+        igstAmt: parseFloat(dbTotals.igstAmt) || 0,
+        totalAmount: parseFloat(dbTotals.totalAmount) || 0,
+        baseAmount: parseFloat(dbTotals.amount) || 0, // Add baseAmount for consistency
+      };
+    }
+
+    // Calculate totals including discounts - DYNAMIC CALCULATION
+    console.log(
+      'Calculating dynamic totals for mode:',
+      mode,
+      'Order data length:',
+      orderData.length,
+    );
+
+    let totalQty = 0;
+    let totalBaseAmount = 0; // Amount before discounts(qty * rate)
+    let totalDiscAmt = 0;
+    let totalSplDiscAmt = 0;
+    let totalSgstAmt = 0;
+    let totalCgstAmt = 0;
+    let totalIgstAmt = 0;
+    let totalAmount = 0; // Final amount after discounts and GST
+
+    // Calculate for existing rows
+    orderData.forEach(row => {
+      const qty = parseFloat(row.itemQty) || 0;
+      const rate = parseFloat(row.rate) || 0;
+      totalQty += qty;
+
+      const baseAmount = qty * rate;
+      totalBaseAmount += baseAmount;
+
+      const discAmt = parseFloat(row.discAmt) || 0;
+      const splDiscAmt = parseFloat(row.splDiscAmt) || 0;
+
+      totalDiscAmt += discAmt;
+      totalSplDiscAmt += splDiscAmt;
+
+      // const discountedAmount = baseAmount - discAmt - splDiscAmt;
+
+      // Add GST amounts
+      totalSgstAmt += parseFloat(row.sgst) || 0;
+      totalCgstAmt += parseFloat(row.cgst) || 0;
+      totalIgstAmt += parseFloat(row.igst) || 0;
+
+      // Add final amount (should match row.amount)
+      totalAmount += parseFloat(row.amount) || 0;
+    });
+
+    // Calculate for editing row if it has data
+    let editingRowQty = 0;
+    let editingRowBaseAmount = 0;
+    let editingRowDiscAmt = 0;
+    let editingRowSplDiscAmt = 0;
+    let editingRowSgst = 0;
+    let editingRowCgst = 0;
+    let editingRowIgst = 0;
+    let editingRowAmount = 0;
+
+    const hasEditingRowData = editingRow.item && editingRow.quantity;
+    if (hasEditingRowData) {
+      editingRowQty = parseFloat(editingRow.quantity) || 0;
+      const editingRowRate = parseFloat(editingRow.rate) || 0;
+      editingRowBaseAmount = editingRowQty * editingRowRate;
+
+      editingRowDiscAmt = parseFloat(editingRow.discAmt) || 0;
+      editingRowSplDiscAmt = parseFloat(editingRow.splDiscAmt) || 0;
+
+      editingRowSgst = parseFloat(editingRow.sgst) || 0;
+      editingRowCgst = parseFloat(editingRow.cgst) || 0;
+      editingRowIgst = parseFloat(editingRow.igst) || 0;
+
+      editingRowAmount = parseFloat(editingRow.amount) || 0;
+    }
+
+    // Combine totals including editing row
+    const finalTotalQty = totalQty + editingRowQty;
+    const finalTotalBaseAmount = totalBaseAmount + editingRowBaseAmount;
+    const finalTotalDiscAmt = totalDiscAmt + editingRowDiscAmt;
+    const finalTotalSplDiscAmt = totalSplDiscAmt + editingRowSplDiscAmt;
+    const finalTotalSgstAmt = totalSgstAmt + editingRowSgst;
+    const finalTotalCgstAmt = totalCgstAmt + editingRowCgst;
+    const finalTotalIgstAmt = totalIgstAmt + editingRowIgst;
+    const finalTotalAmount = totalAmount + editingRowAmount;
+
+    // Calculate amount without tax (after discounts, before GST)
+    const amountWithoutTax = finalTotalBaseAmount - finalTotalDiscAmt - finalTotalSplDiscAmt;
+
+    // Verify calculation: amountWithoutTax + GST should equal totalAmount
+    const calculatedTotalAmount =
+      amountWithoutTax + finalTotalSgstAmt + finalTotalCgstAmt + finalTotalIgstAmt;
+
+    console.log('Dynamic Totals Calculation for mode', mode, ':', {
+      finalTotalQty,
+      finalTotalBaseAmount,
+      finalTotalDiscAmt,
+      finalTotalSplDiscAmt,
+      amountWithoutTax,
+      finalTotalSgstAmt,
+      finalTotalCgstAmt,
+      finalTotalIgstAmt,
+      finalTotalAmount,
+      calculatedTotalAmount,
+      difference: Math.abs(finalTotalAmount - calculatedTotalAmount),
+      orderDataLength: orderData.length,
+      hasEditingRowData,
+    });
+
     return {
-      qty: parseFloat(dbTotals.qty) || 0,
-      amount: parseFloat(dbTotals.amount) || 0,
-      discAmt: parseFloat(dbTotals.discAmt) || 0,
-      splDiscAmt: parseFloat(dbTotals.splDiscAmt) || 0,
-      sgstAmt: parseFloat(dbTotals.sgstAmt) || 0,
-      cgstAmt: parseFloat(dbTotals.cgstAmt) || 0,
-      igstAmt: parseFloat(dbTotals.igstAmt) || 0,
-      totalAmount: parseFloat(dbTotals.totalAmount) || 0,
-      baseAmount: parseFloat(dbTotals.amount) || 0, // Add baseAmount for consistency
+      qty: finalTotalQty,
+      amount: amountWithoutTax, // Amount after discounts, before GST
+      baseAmount: finalTotalBaseAmount, // Amount before any discounts
+      discAmt: finalTotalDiscAmt,
+      splDiscAmt: finalTotalSplDiscAmt,
+      sgstAmt: finalTotalSgstAmt,
+      cgstAmt: finalTotalCgstAmt,
+      igstAmt: finalTotalIgstAmt,
+      totalAmount: finalTotalAmount, // Final amount after discounts and GST
+      calculatedTotalAmount, // For debugging
     };
-  }
-  
-  // Calculate totals including discounts - DYNAMIC CALCULATION
-  console.log('Calculating dynamic totals for mode:', mode, 'Order data length:', orderData.length);
-  
-  let totalQty = 0;
-  let totalBaseAmount = 0; // Amount before discounts(qty * rate)
-  let totalDiscAmt = 0;
-  let totalSplDiscAmt = 0;
-  let totalSgstAmt = 0;
-  let totalCgstAmt = 0;
-  let totalIgstAmt = 0;
-  let totalAmount = 0; // Final amount after discounts and GST
+  }, [orderData, editingRow, isTamilNaduState, mode, dbTotals]);
 
-  // Calculate for existing rows
-  orderData.forEach(row => {
-    const qty = parseFloat(row.itemQty) || 0;
-    const rate = parseFloat(row.rate) || 0;
-    totalQty += qty;
-    
-    const baseAmount = qty * rate;
-    totalBaseAmount += baseAmount;
-    
-    const discAmt = parseFloat(row.discAmt) || 0;
-    const splDiscAmt = parseFloat(row.splDiscAmt) || 0;
-    
-    totalDiscAmt += discAmt;
-    totalSplDiscAmt += splDiscAmt;
-    
-    const discountedAmount = baseAmount - discAmt - splDiscAmt;
-    
-    // Add GST amounts
-    totalSgstAmt += parseFloat(row.sgst) || 0;
-    totalCgstAmt += parseFloat(row.cgst) || 0;
-    totalIgstAmt += parseFloat(row.igst) || 0;
-    
-    // Add final amount (should match row.amount)
-    totalAmount += parseFloat(row.amount) || 0;
-  });
-
-  // Calculate for editing row if it has data
-  let editingRowQty = 0;
-  let editingRowBaseAmount = 0;
-  let editingRowDiscAmt = 0;
-  let editingRowSplDiscAmt = 0;
-  let editingRowSgst = 0;
-  let editingRowCgst = 0;
-  let editingRowIgst = 0;
-  let editingRowAmount = 0;
-
-  const hasEditingRowData = editingRow.item && editingRow.quantity;
-  if (hasEditingRowData) {
-    editingRowQty = parseFloat(editingRow.quantity) || 0;
-    const editingRowRate = parseFloat(editingRow.rate) || 0;
-    editingRowBaseAmount = editingRowQty * editingRowRate;
-    
-    editingRowDiscAmt = parseFloat(editingRow.discAmt) || 0;
-    editingRowSplDiscAmt = parseFloat(editingRow.splDiscAmt) || 0;
-    
-    editingRowSgst = parseFloat(editingRow.sgst) || 0;
-    editingRowCgst = parseFloat(editingRow.cgst) || 0;
-    editingRowIgst = parseFloat(editingRow.igst) || 0;
-    
-    editingRowAmount = parseFloat(editingRow.amount) || 0;
-  }
-
-  // Combine totals including editing row
-  const finalTotalQty = totalQty + editingRowQty;
-  const finalTotalBaseAmount = totalBaseAmount + editingRowBaseAmount;
-  const finalTotalDiscAmt = totalDiscAmt + editingRowDiscAmt;
-  const finalTotalSplDiscAmt = totalSplDiscAmt + editingRowSplDiscAmt;
-  const finalTotalSgstAmt = totalSgstAmt + editingRowSgst;
-  const finalTotalCgstAmt = totalCgstAmt + editingRowCgst;
-  const finalTotalIgstAmt = totalIgstAmt + editingRowIgst;
-  const finalTotalAmount = totalAmount + editingRowAmount;
-  
-  // Calculate amount without tax (after discounts, before GST)
-  const amountWithoutTax = finalTotalBaseAmount - finalTotalDiscAmt - finalTotalSplDiscAmt;
-  
-  // Verify calculation: amountWithoutTax + GST should equal totalAmount
-  const calculatedTotalAmount = amountWithoutTax + finalTotalSgstAmt + finalTotalCgstAmt + finalTotalIgstAmt;
-  
-  console.log('Dynamic Totals Calculation for mode', mode, ':', {
-    finalTotalQty,
-    finalTotalBaseAmount,
-    finalTotalDiscAmt,
-    finalTotalSplDiscAmt,
-    amountWithoutTax,
-    finalTotalSgstAmt,
-    finalTotalCgstAmt,
-    finalTotalIgstAmt,
-    finalTotalAmount,
-    calculatedTotalAmount,
-    difference: Math.abs(finalTotalAmount - calculatedTotalAmount),
-    orderDataLength: orderData.length,
-    hasEditingRowData
-  });
-  
-  return {
-    qty: finalTotalQty,
-    amount: amountWithoutTax, // Amount after discounts, before GST
-    baseAmount: finalTotalBaseAmount, // Amount before any discounts
-    discAmt: finalTotalDiscAmt,
-    splDiscAmt: finalTotalSplDiscAmt,
-    sgstAmt: finalTotalSgstAmt,
-    cgstAmt: finalTotalCgstAmt,
-    igstAmt: finalTotalIgstAmt,
-    totalAmount: finalTotalAmount, // Final amount after discounts and GST
-    calculatedTotalAmount, // For debugging
-  };
-}, [orderData, editingRow, isTamilNaduState, mode, dbTotals]);
-
-// Add this useEffect to debug totals changes
-useEffect(() => {
-  console.log('=== TOTALS DEBUG ===');
-  console.log('Order Data:', orderData.map(row => ({
-    item: row.itemName,
-    qty: row.itemQty,
-    rate: row.rate,
-    baseAmount: (parseFloat(row.itemQty) || 0) * (parseFloat(row.rate) || 0),
-    disc: row.disc,
-    discAmt: row.discAmt,
-    splDisc: row.splDisc,
-    splDiscAmt: row.splDiscAmt,
-    sgst: row.sgst,
-    cgst: row.cgst,
-    igst: row.igst,
-    amount: row.amount,
-    netRate: row.netRate,
-    grossAmount: row.grossAmount
-  })));
-  console.log('Editing Row:', editingRow);
-  console.log('Calculated Totals:', totals);
-}, [orderData, editingRow, totals]);
+  // Add this useEffect to debug totals changes
+  useEffect(() => {
+    console.log('=== TOTALS DEBUG ===');
+    console.log(
+      'Order Data:',
+      orderData.map(row => ({
+        item: row.itemName,
+        qty: row.itemQty,
+        rate: row.rate,
+        baseAmount: (parseFloat(row.itemQty) || 0) * (parseFloat(row.rate) || 0),
+        disc: row.disc,
+        discAmt: row.discAmt,
+        splDisc: row.splDisc,
+        splDiscAmt: row.splDiscAmt,
+        sgst: row.sgst,
+        cgst: row.cgst,
+        igst: row.igst,
+        amount: row.amount,
+        netRate: row.netRate,
+        grossAmount: row.grossAmount,
+      })),
+    );
+    console.log('Editing Row:', editingRow);
+    console.log('Calculated Totals:', totals);
+  }, [orderData, editingRow, totals]);
 
   const handlePrimaryAction = e => {
     if (mode === 'update') {
@@ -385,159 +391,159 @@ useEffect(() => {
   };
 
   const handleUpdate = async e => {
-  e.preventDefault();
-  const confirmation = window.confirm(`Are you sure you want to update Order ${orderNumber}?`);
+    e.preventDefault();
+    const confirmation = window.confirm(`Are you sure you want to update Order ${orderNumber}?`);
 
-  if (!confirmation) return;
+    if (!confirmation) return;
 
-  setIsSubmitting(true);
-  try {
-    console.log('Update - Current totals:', totals);
-    console.log('Update - Order data:', orderData);
-    
-    // Prepare the payload array
-    const updates = [];
-    
-    // Process orderData to create payload
-    orderData.forEach(item => {
-      const rowData = {
-        // For existing rows, include id; for new rows, don't include id
-        ...(item.id && { id: item.id }),
-        
-        // Row-specific data
-        status: status,
-        disc_percentage: Number(item.disc) || 0,
-        disc_amount: Number(item.discAmt) || 0,
-        spl_disc_percentage: Number(item.splDisc) || 0,
-        spl_disc_amount: Number(item.splDiscAmt) || 0,
-        net_rate: Number(item.netRate) || 0,
-        gross_amount: Number(item.grossAmount) || 0,
-        quantity: Number(item.itemQty) || 0,
-        gst: Number(item.gst || 0),
-        sgst: Number(item.sgst || 0),
-        cgst: Number(item.cgst || 0),
-        igst: Number(item.igst || 0),
-        hsn: item.hsn || '',
-        rate: Number(item.rate || 0),
-        amount: Number(item.amount || 0),
-        uom: item.uom || '',
-        delivery_date: convertToMySQLDate(item.delivery_date),
-        delivery_mode: item.delivery_mode || '',
-        transporter_name: item.transporter_name || '',
-        item_code: item.itemCode || '',
-        item_name: item.itemName || '',
-        
-        // Common order details
-        voucher_type: voucherType,
-        order_date: date,  // Changed from 'date' to 'order_date' to match backend
-        customer_code: customerName?.customer_code || distributorUser?.customer_code || '',
-        customer_name: customerName?.customer_name || distributorUser?.customer_name || '',
-        executive: executiveName?.customer_name || '',
-        role: distributorUser?.role || '',
-        
-        // Totals
-        total_quantity: totals.qty,
-        total_amount_without_tax: totals.amount,
-        total_amount: totals.totalAmount,
-        total_sgst_amount: totals.sgstAmt,
-        total_cgst_amount: totals.cgstAmt,
-        total_igst_amount: totals.igstAmt,
-        remarks: remarks || '',
-      };
-      
-      // If this is a deleted row (marked for deletion), add _deleted flag
-      if (item._deleted && item.id) {
-        rowData._deleted = true;
+    setIsSubmitting(true);
+    try {
+      console.log('Update - Current totals:', totals);
+      console.log('Update - Order data:', orderData);
+
+      // Prepare the payload array
+      const updates = [];
+
+      // Process orderData to create payload
+      orderData.forEach(item => {
+        const rowData = {
+          // For existing rows, include id; for new rows, don't include id
+          ...(item.id && { id: item.id }),
+
+          // Row-specific data
+          status: status,
+          disc_percentage: Number(item.disc) || 0,
+          disc_amount: Number(item.discAmt) || 0,
+          spl_disc_percentage: Number(item.splDisc) || 0,
+          spl_disc_amount: Number(item.splDiscAmt) || 0,
+          net_rate: Number(item.netRate) || 0,
+          gross_amount: Number(item.grossAmount) || 0,
+          quantity: Number(item.itemQty) || 0,
+          gst: Number(item.gst || 0),
+          sgst: Number(item.sgst || 0),
+          cgst: Number(item.cgst || 0),
+          igst: Number(item.igst || 0),
+          hsn: item.hsn || '',
+          rate: Number(item.rate || 0),
+          amount: Number(item.amount || 0),
+          uom: item.uom || '',
+          delivery_date: convertToMySQLDate(item.delivery_date),
+          delivery_mode: item.delivery_mode || '',
+          transporter_name: item.transporter_name || '',
+          item_code: item.itemCode || '',
+          item_name: item.itemName || '',
+
+          // Common order details
+          voucher_type: voucherType,
+          order_date: date, // Changed from 'date' to 'order_date' to match backend
+          customer_code: customerName?.customer_code || distributorUser?.customer_code || '',
+          customer_name: customerName?.customer_name || distributorUser?.customer_name || '',
+          executive: executiveName?.customer_name || '',
+          role: distributorUser?.role || '',
+
+          // Totals
+          total_quantity: totals.qty,
+          total_amount_without_tax: totals.amount,
+          total_amount: totals.totalAmount,
+          total_sgst_amount: totals.sgstAmt,
+          total_cgst_amount: totals.cgstAmt,
+          total_igst_amount: totals.igstAmt,
+          remarks: remarks || '',
+        };
+
+        // If this is a deleted row (marked for deletion), add _deleted flag
+        if (item._deleted && item.id) {
+          rowData._deleted = true;
+        }
+
+        updates.push(rowData);
+      });
+
+      // IMPORTANT: Also include the editing row if it has data (for new item addition)
+      const hasEditingRowData = editingRow.item && editingRow.quantity;
+      if (hasEditingRowData) {
+        // Create new row without id
+        const newRow = {
+          // No id field - this signals it's a new row
+          status: status,
+          disc_percentage: Number(editingRow.disc) || 0,
+          disc_amount: Number(editingRow.discAmt) || 0,
+          spl_disc_percentage: Number(editingRow.splDisc) || 0,
+          spl_disc_amount: Number(editingRow.splDiscAmt) || 0,
+          net_rate: Number(editingRow.netRate) || 0,
+          gross_amount: Number(editingRow.grossAmount) || 0,
+          quantity: Number(editingRow.quantity) || 0,
+          gst: Number(editingRow.gst || 0),
+          sgst: Number(editingRow.sgst || 0),
+          cgst: Number(editingRow.cgst || 0),
+          igst: Number(editingRow.igst || 0),
+          hsn: editingRow.hsn || editingRow.item?.hsn_code || '',
+          rate: Number(editingRow.rate || 0),
+          amount: Number(editingRow.amount || 0),
+          uom: editingRow.item?.uom || 'Nos',
+          delivery_date: convertToMySQLDate(editingRow.delivery_date),
+          delivery_mode: editingRow.delivery_mode || '',
+          transporter_name: editingRow.transporter_name || '',
+          item_code: editingRow.item?.item_code || '',
+          item_name: editingRow.item?.stock_item_name || '',
+
+          // Common order details
+          voucher_type: voucherType,
+          order_date: date,
+          customer_code: customerName?.customer_code || distributorUser?.customer_code || '',
+          customer_name: customerName?.customer_name || distributorUser?.customer_name || '',
+          executive: executiveName?.customer_name || '',
+          role: distributorUser?.role || '',
+
+          // Totals
+          total_quantity: totals.qty,
+          total_amount_without_tax: totals.amount,
+          total_amount: totals.totalAmount,
+          total_sgst_amount: totals.sgstAmt,
+          total_cgst_amount: totals.cgstAmt,
+          total_igst_amount: totals.igstAmt,
+          remarks: remarks || '',
+        };
+
+        updates.push(newRow);
       }
-      
-      updates.push(rowData);
-    });
-    
-    // IMPORTANT: Also include the editing row if it has data (for new item addition)
-    const hasEditingRowData = editingRow.item && editingRow.quantity;
-    if (hasEditingRowData) {
-      // Create new row without id
-      const newRow = {
-        // No id field - this signals it's a new row
-        status: status,
-        disc_percentage: Number(editingRow.disc) || 0,
-        disc_amount: Number(editingRow.discAmt) || 0,
-        spl_disc_percentage: Number(editingRow.splDisc) || 0,
-        spl_disc_amount: Number(editingRow.splDiscAmt) || 0,
-        net_rate: Number(editingRow.netRate) || 0,
-        gross_amount: Number(editingRow.grossAmount) || 0,
-        quantity: Number(editingRow.quantity) || 0,
-        gst: Number(editingRow.gst || 0),
-        sgst: Number(editingRow.sgst || 0),
-        cgst: Number(editingRow.cgst || 0),
-        igst: Number(editingRow.igst || 0),
-        hsn: editingRow.hsn || editingRow.item?.hsn_code || '',
-        rate: Number(editingRow.rate || 0),
-        amount: Number(editingRow.amount || 0),
-        uom: editingRow.item?.uom || 'Nos',
-        delivery_date: convertToMySQLDate(editingRow.delivery_date),
-        delivery_mode: editingRow.delivery_mode || '',
-        transporter_name: editingRow.transporter_name || '',
-        item_code: editingRow.item?.item_code || '',
-        item_name: editingRow.item?.stock_item_name || '',
-        
-        // Common order details
-        voucher_type: voucherType,
-        order_date: date,
-        customer_code: customerName?.customer_code || distributorUser?.customer_code || '',
-        customer_name: customerName?.customer_name || distributorUser?.customer_name || '',
-        executive: executiveName?.customer_name || '',
-        role: distributorUser?.role || '',
-        
-        // Totals
-        total_quantity: totals.qty,
-        total_amount_without_tax: totals.amount,
-        total_amount: totals.totalAmount,
-        total_sgst_amount: totals.sgstAmt,
-        total_cgst_amount: totals.cgstAmt,
-        total_igst_amount: totals.igstAmt,
-        remarks: remarks || '',
-      };
-      
-      updates.push(newRow);
+
+      console.log('Sending update for order:', orderNumber);
+      console.log('Update payload breakdown:', {
+        totalItems: updates.length,
+        existingWithId: updates.filter(item => item.id).length,
+        newWithoutId: updates.filter(item => !item.id).length,
+        deleted: updates.filter(item => item._deleted).length,
+      });
+
+      // Log a sample payload to see structure
+      console.log('Sample payload item:', updates[0]);
+
+      const response = await api.put(`/orders-by-number/${orderNumber}`, updates);
+      console.log('Update response:', response.data);
+
+      if (response.data.success) {
+        toast.success(`Order ${orderNumber} updated successfully!`);
+        // Option 1: Refresh the page to get new IDs
+        window.location.reload();
+        // Option 2: Navigate back
+        // navigate(-1);
+      } else {
+        toast.error(`Update failed: ${response.data.error}`);
+      }
+    } catch (error) {
+      console.error('Error updating order:', error);
+      console.error('Error response:', error.response?.data);
+
+      if (error.response?.data?.message) {
+        toast.error(`Update failed: ${error.response.data.message}`);
+      } else {
+        toast.error('Failed to update order. Please check console for details.');
+      }
+    } finally {
+      setIsSubmitting(false);
     }
-    
-    console.log('Sending update for order:', orderNumber);
-    console.log('Update payload breakdown:', {
-      totalItems: updates.length,
-      existingWithId: updates.filter(item => item.id).length,
-      newWithoutId: updates.filter(item => !item.id).length,
-      deleted: updates.filter(item => item._deleted).length
-    });
-    
-    // Log a sample payload to see structure
-    console.log('Sample payload item:', updates[0]);
-    
-    const response = await api.put(`/orders-by-number/${orderNumber}`, updates);
-    console.log('Update response:', response.data);
-    
-    if (response.data.success) {
-      toast.success(`Order ${orderNumber} updated successfully!`);
-      // Option 1: Refresh the page to get new IDs
-      window.location.reload();
-      // Option 2: Navigate back
-      // navigate(-1);
-    } else {
-      toast.error(`Update failed: ${response.data.error}`);
-    }
-  } catch (error) {
-    console.error('Error updating order:', error);
-    console.error('Error response:', error.response?.data);
-    
-    if (error.response?.data?.message) {
-      toast.error(`Update failed: ${error.response.data.message}`);
-    } else {
-      toast.error('Failed to update order. Please check console for details.');
-    }
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+  };
 
   const postOrder = async payload => {
     try {
@@ -674,7 +680,7 @@ useEffect(() => {
       console.log('Rows to submit:', rows);
 
       // Prepare payload
-      const payload = rows.map((item, index) => ({
+      const payload = rows.map((item) => ({
         voucher_type: voucherType,
         order_no: orderNumber,
         date: date,
@@ -787,27 +793,28 @@ useEffect(() => {
   };
 
   // Clear dbTotals when orderData changes in update mode
-useEffect(() => {
-  if (mode === 'update' && orderData.length > 0) {
-    // When we modify orderData in update mode, clear dbTotals to force dynamic calculation
-    setDbTotals(null);
-    console.log('Cleared dbTotals for dynamic calculation');
-  }
-}, [orderData, mode]);
+  useEffect(() => {
+    if (mode === 'update' && orderData.length > 0) {
+      // When we modify orderData in update mode, clear dbTotals to force dynamic calculation
+      setDbTotals(null);
+      console.log('Cleared dbTotals for dynamic calculation');
+    }
+  }, [orderData, mode]);
 
-// Debug log to check values
-useEffect(() => {
-  console.log('Debug - Current values:', {
-    userRole,
-    isDistributorRoute,
-    selectedCustomer: selectedCustomer?.state,
-    distributorUser: distributorUser?.state,
-    isTamilNadu: isTamilNaduState(), // Using hook's function
-  });
-}, [userRole, isDistributorRoute, selectedCustomer, distributorUser, isTamilNaduState]);
+  // Debug log to check values
+  useEffect(() => {
+    console.log('Debug - Current values:', {
+      userRole,
+      isDistributorRoute,
+      selectedCustomer: selectedCustomer?.state,
+      distributorUser: distributorUser?.state,
+      isTamilNadu: isTamilNaduState(), // Using hook's function
+    });
+  }, [userRole, isDistributorRoute, selectedCustomer, distributorUser, isTamilNaduState]);
 
   return (
     <div className="p-3 bg-amber-50 border-2 h-screen font-amasis">
+
       <OrderHeader
         onBack={handleBackClick}
         location={location}

@@ -11,7 +11,6 @@ export const useOrderFormHook = onBack => {
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [showRowValueRows, setShowRowValueRows] = useState(true);
   const [formResetKey, setFormResetKey] = useState(0);
-  const [originalOrderData, setOriginalOrderData] = useState([]);
   const [editingRow, setEditingRow] = useState({
     item: null,
     delivery_date: '',
@@ -33,7 +32,6 @@ export const useOrderFormHook = onBack => {
   const [dbTotals, setDbTotals] = useState(null);
   const [executiveName, setExecutiveName] = useState(null);
   const [status, setStatus] = useState('pending');
-  const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { distributorUser, user } = useAuth();
@@ -56,8 +54,7 @@ export const useOrderFormHook = onBack => {
   const isDirectRoute = location.pathname.includes('/corporate');
   const isCorporateReport = location.pathname.includes('/order-report-corporate');
   const isDistributorReport = location.pathname.includes('/order-report-distributor');
-  const isApprovedReport = location.pathname.includes('/order-report-approved');
-  const isReportRoute = isCorporateReport || isDistributorReport || isApprovedReport;
+  const isReportRoute = isCorporateReport || isDistributorReport;
   const isViewOnlyReport = isCorporateReport || isDistributorReport;
 
   // Escape key navigation
@@ -169,8 +166,6 @@ const isTamilNaduState = useCallback(() => {
     setSelectedCustomer,
     showRowValueRows,
     setShowRowValueRows,
-    originalOrderData,
-    setOriginalOrderData,
     editingRow,
     setEditingRow,
     voucherType,
@@ -179,8 +174,6 @@ const isTamilNaduState = useCallback(() => {
     setExecutiveName,
     status,
     setStatus,
-    loading,
-    setLoading,
     isSubmitting,
     setIsSubmitting,
     formResetKey,
@@ -192,7 +185,6 @@ const isTamilNaduState = useCallback(() => {
     isDirectRoute,
     isCorporateReport,
     isDistributorReport,
-    isApprovedReport,
     isReportRoute,
     isViewOnlyReport,
     dbTotals,
