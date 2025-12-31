@@ -389,6 +389,10 @@ useEffect(() => {
 
   const handleUpdate = async e => {
   e.preventDefault();
+  const confirmation = window.confirm(`Are you sure you want to update Order ${orderNumber}?`);
+
+  if (!confirmation) return;
+
   setIsSubmitting(true);
   try {
     console.log('Update - Current totals:', totals);
@@ -554,6 +558,9 @@ useEffect(() => {
   // Handle form submission
   const handleSubmit = async e => {
     e.preventDefault();
+
+    const confirmation = window.confirm('Are you sure you want to submit this order?');
+    if (!confirmation) return;
 
     if (isSubmitting) return;
     setIsSubmitting(true);

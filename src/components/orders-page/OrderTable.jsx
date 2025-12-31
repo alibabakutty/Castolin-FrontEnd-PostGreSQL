@@ -501,6 +501,9 @@ const OrderTable = ({
   };
 
   const handleDeleteRow = index => {
+    const confirmed = window.confirm('Are you sure you want to delete this row?');
+    if (!confirmed) return;
+
     const rowToDelete = orderData[index];
 
     if (rowToDelete.id) {
@@ -517,8 +520,6 @@ const OrderTable = ({
       const updatedOrderData = orderData.filter((_, i) => i !== index);
       setOrderData(updatedOrderData);
     }
-
-    toast.info('Row marked for deletion. Click Update to save changes.');
   };
 
   // Handle date blur formatting
@@ -557,53 +558,67 @@ const OrderTable = ({
   });
 
   // Add this separate handler for select inputs
-const handleSelectKeyDown = (e, rowIndex, colIndex) => {
+  const handleSelectKeyDown = (e, rowIndex, colIndex, selectedItem) => {
   const key = e.key;
   const totalRows = orderData.length + 1;
-  
-  if (key === 'Enter' || key === 'Tab') {
-    
-  } else if (key === 'ArrowRight') {
+
+  /* =======================
+     ARROW RIGHT
+     ======================= */
+  if (key === 'ArrowRight') {
     e.preventDefault();
-    // Move to next column (Product Name)
+
+    // ✅ CASE 1: Item code EMPTY → focus Remarks
+    if (!selectedItem) {
+      setTimeout(() => {
+        const remarksTextarea = document.querySelector(
+          'textarea[name="remarks"]'
+        );
+        remarksTextarea?.focus();
+      }, 0);
+      return;
+    }
+
+    // ✅ CASE 2: Item code SELECTED → go to Product Name
     setTimeout(() => {
       if (rowIndex === totalRows - 1) {
         // Editing row
         editingRowInputRefs.current.itemName?.focus();
       } else {
         // Existing row
-        const actualColIndex = getActualColumnIndex(2); // Product Name column
+        const actualColIndex = getActualColumnIndex(2); // Product Name
         if (actualColIndex !== -1) {
           const refIndex = rowIndex * totalCols + actualColIndex;
           inputRefs.current[refIndex]?.focus();
         }
       }
     }, 0);
-  } else if (key === 'ArrowLeft' || key === 'Backspace') {
+  }
+
+  /* =======================
+     ARROW LEFT / BACKSPACE
+     ======================= */
+  else if (key === 'ArrowLeft' || key === 'Backspace') {
     e.preventDefault();
-    // Move to previous row's last input field
-    let prevRow = rowIndex - 1;
-    if (prevRow >= 0) {
-      setTimeout(() => {
-        if (prevRow === totalRows - 1) {
-          // Moving to editing row's last column
-          const lastCol = showDiscountColumns() ? 15 : 13; // Delivery Mode column
-          editingRowInputRefs.current.delivery_mode?.focus();
-        } else {
-          // Moving to previous row's last input field
-          const lastCol = showDiscountColumns() ? 15 : 13; // Delivery Mode column
-          const actualColIndex = getActualColumnIndex(lastCol);
-          if (actualColIndex !== -1) {
-            const refIndex = prevRow * totalCols + actualColIndex;
-            inputRefs.current[refIndex]?.focus();
-          }
+
+    const prevRow = rowIndex - 1;
+    if (prevRow < 0) return;
+
+    setTimeout(() => {
+      const lastCol = showDiscountColumns() ? 16 : 14;
+
+      if (prevRow === totalRows - 1) {
+        // Editing row last column
+        editingRowInputRefs.current.delivery_mode?.focus();
+      } else {
+        // Existing row last column
+        const actualColIndex = getActualColumnIndex(lastCol);
+        if (actualColIndex !== -1) {
+          const refIndex = prevRow * totalCols + actualColIndex;
+          inputRefs.current[refIndex]?.focus();
         }
-      }, 0);
-    }
-  } else if (key === 'ArrowDown') {
-    
-  } else if (key === 'ArrowUp') {
-    
+      }
+    }, 0);
   }
 };
 
