@@ -105,6 +105,7 @@ const TableRow = ({
           components={{
             DropdownIndicator: () => null,
             IndicatorSeparator: () => null,
+            ClearIndicator: () => null,
           }}
           isDisabled={isDistributorReport || isCorporateReport}
           formatOptionLabel={(option, { context }) => {
@@ -113,6 +114,8 @@ const TableRow = ({
             }
             return option.item_code;
           }}
+          isClearable={true}
+          isSearchable={true}
           menuPortalTarget={document.body}
         />
       </td>

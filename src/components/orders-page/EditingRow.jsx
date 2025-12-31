@@ -81,7 +81,7 @@ const EditingRow = ({
           onKeyDown={e => handleSelectKeyDown(e, orderData.length, 1, editingRow.item)}
           placeholder=""
           styles={tableSelectStyles}
-          components={{ DropdownIndicator: () => null, IndicatorSeparator: () => null }}
+          components={{ DropdownIndicator: () => null, IndicatorSeparator: () => null, ClearIndicator: () => null }}
           isDisabled={isDistributorReport || isCorporateReport}
           formatOptionLabel={(option, { context }) => {
             if (context === 'menu') {
@@ -89,6 +89,8 @@ const EditingRow = ({
             }
             return option.item_code;
           }}
+          isClearable={true}
+          isSearchable={true}
           menuPortalTarget={document.body}
         />
       </td>
